@@ -1,0 +1,43 @@
+version: '3.8'
+services:
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/bookmind
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    networks:
+      - bookmind-net
+
+  db:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_DB: bookmind
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    networks:
+      - bookmind-net
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - bookmind-net
+
+volumes:
+  dbdata:
+
+networks:
+  bookmind-net:
+
