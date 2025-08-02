@@ -3,6 +3,7 @@ package com.bookmind.model;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.*;
 
 @Data
 @NoArgsConstructor
@@ -19,16 +20,53 @@ public class Book {
     @Column(length = 2000)
     private String description;
     private String genre;
+
+    @ManyToMany
+    @JoinTable(name = "book_categories",
+               joinColumns = @JoinColumn(name = "book_id"),
+               inverseJoinColumns = @JoinColumn(name = "category_id"))
+    private Set<Category> categories = new HashSet<>();
+
     private String language;
     private String publisher;
     private int publicationYear;
     private double price;
     private boolean available;
     private int pages;
-    private double rating;
+    private double averageRating;
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Review> reviews = new ArrayList<>();
     private String coverImageUrl;
     private String isbn;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public void addCategory(Category category) {
+        if(category != null){
+            categories.add(category);
+            category.getBooks().add(this);
+        }
+    }
+
+    public void removeCategory(Category category) {
+        if(category != null){
+            categories.remove(category);
+            category.getBooks().remove(this);
+        }
+    }
+
+    public void addReview(Review review) {
+        if(review != null){
+            reviews.add(review);
+            review.setBook(this);
+        }
+    }
+
+    public void removeReview(Review review) {
+        if(review != null){
+            reviews.remove(review);
+            review.setBook(null);
+        }
+    }
 
 }

@@ -1,12 +1,23 @@
 package com.bookmind.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(of = "id")
 @Data
 @Entity
 @Table(name = "whishlists")
 public class WishList extends UserBookCollection{
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     private String name; // Optional: e.g., "Favorites", "To Read", etc.
 
@@ -18,6 +29,8 @@ public class WishList extends UserBookCollection{
     }
 
     public void removeBook(Book book) {
-        super.removeBook(book);
+        if(book != null){
+            super.removeBook(book);
+        }
     }
 }

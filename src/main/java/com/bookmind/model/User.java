@@ -36,4 +36,58 @@ public class User {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Cart cart;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<WishList> wishlists = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Order> orders = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Review> reviews = new ArrayList<>();
+
+    public void addReview(Review review){
+        if(review != null){
+            reviews.add(review);
+            review.setUser(this);
+        }
+    }
+
+    public void removeReview(Review review){
+        if(review != null){
+            reviews.remove(review);
+            review.setUser(null);
+        }
+    }
+
+    public void addWishList(WishList wishList) {
+        if (wishList != null) {
+            wishlists.add(wishList);
+            wishList.setUser(this);
+        }
+    }
+
+    public void removeWishList(WishList wishList){
+        if (wishList != null) {
+            wishlists.remove(wishList);
+            wishList.setUser(null);
+        }
+    }
+
+    public void addOrder(Order order) {
+        if (order != null) {
+            orders.add(order);
+            order.setUser(this);
+        }
+    }
+
+    public void removeOrder(Order order) {
+        if (order != null) {
+            orders.remove(order);
+            order.setUser(null);
+        }
+    }
+
 }

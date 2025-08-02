@@ -1,6 +1,8 @@
 package com.bookmind.model;
 
 import jakarta.persistence.*;
+
+import java.time.LocalDateTime;
 import java.util.*;
 
 @MappedSuperclass
@@ -10,10 +12,6 @@ public class UserBookCollection implements BookCollection {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     protected Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id")
-    protected User user;
-
     @ManyToMany
     @JoinTable(
             name = "collection_books",
@@ -21,6 +19,9 @@ public class UserBookCollection implements BookCollection {
             inverseJoinColumns = @JoinColumn(name = "book_id")
     )
     protected List<Book> books = new ArrayList<>();
+
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     @Override
     public void addBook(Book book) {
