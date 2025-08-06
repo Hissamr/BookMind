@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import jakarta.persistence.PrePersist;
 
 @NoArgsConstructor
 @AllArgsConstructor
@@ -26,4 +27,8 @@ public class Review {
     private String comment;
     private LocalDateTime createdAt;
 
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }

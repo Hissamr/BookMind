@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.*;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 
 @Data
 @NoArgsConstructor
@@ -89,5 +91,15 @@ public class User {
             order.setUser(null);
         }
     }
+    
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
 
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

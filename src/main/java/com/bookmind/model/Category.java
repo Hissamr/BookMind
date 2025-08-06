@@ -2,6 +2,8 @@ package com.bookmind.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDateTime;
 import java.util.*;
 
 @NoArgsConstructor
@@ -20,6 +22,9 @@ public class Category {
     @ManyToMany(mappedBy = "categories")
     private Set<Book> books = new HashSet<>();
 
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
     public void addBook(Book book) {
         if(book != null){
             books.add(book);
@@ -32,6 +37,17 @@ public class Category {
             books.remove(book);
             book.getCategories().remove(this); // Ensure bidirectional relationship
         }
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 
 }

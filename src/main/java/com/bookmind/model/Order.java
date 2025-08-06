@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.*;
+import jakarta.persistence.PrePersist;
 
 @NoArgsConstructor
 @AllArgsConstructor
@@ -42,5 +43,12 @@ public class Order {
             totalAmount -= orderItem.getPrice() * orderItem.getQuantity();
         }
     }
-
+    
+    @PrePersist
+    protected void onCreate() {
+        this.orderDate = LocalDateTime.now();
+        if (this.status == null) {
+            this.status = "PENDING";
+        }
+    }
 }
