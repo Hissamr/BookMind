@@ -38,15 +38,18 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     List<Book> findByCategory(@Param("category") Category category);
     
     // Advanced search with multiple criteria
-    @Query("SELECT DISTINCT b FROM Book b " +
-           "WHERE (:title IS NULL OR LOWER(b.title) LIKE LOWER(CONCAT('%', :title, '%'))) " +
-           "AND (:author IS NULL OR LOWER(b.author) LIKE LOWER(CONCAT('%', :author, '%'))) " +
-           "AND (:genre IS NULL OR LOWER(b.genre) LIKE LOWER(CONCAT('%', :genre, '%'))) " +
-           "AND (:description IS NULL OR LOWER(b.description) LIKE LOWER(CONCAT('%', :description, '%'))) " +
-           "AND (:minPrice IS NULL OR b.price >= :minPrice) " +
-           "AND (:maxPrice IS NULL OR b.price <= :maxPrice) " +
-           "AND (:minRating IS NULL OR b.averageRating >= :minRating) " +
-           "AND (:available IS NULL OR b.available = :available)")
+    @Query(value = """
+        SELECT DISTINCT * 
+        FROM books b
+        WHERE (:title IS NULL OR LOWER(b.title) LIKE LOWER(CONCAT('%', :title, '%')))
+        AND (:author IS NULL OR LOWER(b.author) LIKE LOWER(CONCAT('%', :author, '%')))
+        AND (:genre IS NULL OR LOWER(b.genre) LIKE LOWER(CONCAT('%', :genre, '%')))
+        AND (:description IS NULL OR LOWER(b.description) LIKE LOWER(CONCAT('%', :description, '%')))
+        AND (:minPrice IS NULL OR b.price >= :minPrice)
+        AND (:maxPrice IS NULL OR b.price <= :maxPrice)
+        AND (:minRating IS NULL OR b.average_rating >= :minRating)
+        AND (:available IS NULL OR b.available = :available)
+    """, nativeQuery = true)
     List<Book> searchBooks(
         @Param("title") String title,
         @Param("author") String author,
@@ -69,15 +72,25 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     @Query("SELECT b FROM Book b JOIN b.categories c WHERE c = :category")
     Page<Book> findByCategory(@Param("category") Category category, Pageable pageable);
     
-    @Query("SELECT DISTINCT b FROM Book b " +
+    @Query(value = "SELECT DISTINCT * FROM books b " +
            "WHERE (:title IS NULL OR LOWER(b.title) LIKE LOWER(CONCAT('%', :title, '%'))) " +
            "AND (:author IS NULL OR LOWER(b.author) LIKE LOWER(CONCAT('%', :author, '%'))) " +
            "AND (:genre IS NULL OR LOWER(b.genre) LIKE LOWER(CONCAT('%', :genre, '%'))) " +
            "AND (:description IS NULL OR LOWER(b.description) LIKE LOWER(CONCAT('%', :description, '%'))) " +
            "AND (:minPrice IS NULL OR b.price >= :minPrice) " +
            "AND (:maxPrice IS NULL OR b.price <= :maxPrice) " +
-           "AND (:minRating IS NULL OR b.averageRating >= :minRating) " +
-           "AND (:available IS NULL OR b.available = :available)")
+           "AND (:minRating IS NULL OR b.average_rating >= :minRating) " +
+           "AND (:available IS NULL OR b.available = :available)",
+           countQuery = "SELECT count(DISTINCT b.id) FROM books b " +
+           "WHERE (:title IS NULL OR LOWER(b.title) LIKE LOWER(CONCAT('%', :title, '%'))) " +
+           "AND (:author IS NULL OR LOWER(b.author) LIKE LOWER(CONCAT('%', :author, '%'))) " +
+           "AND (:genre IS NULL OR LOWER(b.genre) LIKE LOWER(CONCAT('%', :genre, '%'))) " +
+           "AND (:description IS NULL OR LOWER(b.description) LIKE LOWER(CONCAT('%', :description, '%'))) " +
+           "AND (:minPrice IS NULL OR b.price >= :minPrice) " +
+           "AND (:maxPrice IS NULL OR b.price <= :maxPrice) " +
+           "AND (:minRating IS NULL OR b.average_rating >= :minRating) " +
+           "AND (:available IS NULL OR b.available = :available)",
+           nativeQuery = true)
     Page<Book> searchBooksWithPagination(
         @Param("title") String title,
         @Param("author") String author,

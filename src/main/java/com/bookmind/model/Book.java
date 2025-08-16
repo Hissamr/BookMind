@@ -33,7 +33,7 @@ public class Book {
     private String publisher;
     private int publicationYear;
     private double price;
-    private boolean available;
+    private Boolean available;
     private int pages;
     private double averageRating;
     @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)

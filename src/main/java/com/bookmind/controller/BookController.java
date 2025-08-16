@@ -22,7 +22,7 @@ public class BookController {
        return new ResponseEntity<>(bookService.getAllBooks(), HttpStatus.OK);
     }
 
-    @GetMapping("/book/{id}")
+    @GetMapping("/books/{id}")
     public ResponseEntity<Book> getBookById(@PathVariable Long id) {
         try {
             Book book = bookService.getBookById(id);
@@ -32,7 +32,7 @@ public class BookController {
         }
     }
 
-    @PostMapping("/book")
+    @PostMapping("/books")
     public ResponseEntity<?> addBook(@RequestBody Book book) {
         try {
             Book savedBook = bookService.addBook(book);
@@ -46,7 +46,7 @@ public class BookController {
         }
     }
 
-    @PutMapping("/book/{id}")
+    @PutMapping("/books/{id}")
     public ResponseEntity<?> updateBook(@PathVariable Long id, @RequestBody Book book) {
         try {
             Book updatedBook = bookService.updateBook(id, book);
@@ -56,7 +56,7 @@ public class BookController {
         }
     }
 
-    @DeleteMapping("/book/{id}")
+    @DeleteMapping("/books/{id}")
     public ResponseEntity<?> deleteBook(@PathVariable Long id) {
         try {
             bookService.deleteBook(id);
@@ -66,7 +66,7 @@ public class BookController {
         }
     }
     
-    @PostMapping("/book/{bookId}/category/{categoryId}")
+    @PostMapping("/books/{bookId}/categories/{categoryId}")
     public ResponseEntity<?> addCategoryToBook(@PathVariable Long bookId, @PathVariable Long categoryId) {
         try {
             bookService.addCategoryToBook(bookId, categoryId);
@@ -76,7 +76,7 @@ public class BookController {
         }
     }
     
-    @DeleteMapping("/book/{bookId}/category/{categoryId}")
+    @DeleteMapping("/books/{bookId}/categories/{categoryId}")
     public ResponseEntity<?> removeCategoryFromBook(@PathVariable Long bookId, @PathVariable Long categoryId) {
         try {
             bookService.removeCategoryFromBook(bookId, categoryId);
@@ -86,7 +86,7 @@ public class BookController {
         }
     }
     
-    @PostMapping("/book/{bookId}/review/{reviewId}")
+    @PostMapping("/books/{bookId}/reviews/{reviewId}")
     public ResponseEntity<?> addReviewToBook(@PathVariable Long bookId, @PathVariable Long reviewId) {
         try {
             bookService.addReviewToBook(bookId, reviewId);
@@ -96,13 +96,64 @@ public class BookController {
         }
     }
     
-    @DeleteMapping("/book/{bookId}/review/{reviewId}")
+    @DeleteMapping("/books/{bookId}/reviews/{reviewId}")
     public ResponseEntity<?> removeReviewFromBook(@PathVariable Long bookId, @PathVariable Long reviewId) {
         try {
             bookService.removeReviewFromBook(bookId, reviewId);
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (RuntimeException e) {
             return new ResponseEntity<>("Error removing review from book: " + e.getMessage(), HttpStatus.NOT_FOUND);
+        }
+    }
+    
+    // Get categories for a specific book
+    @GetMapping("/books/{id}/categories")
+    public ResponseEntity<?> getBookCategories(@PathVariable Long id) {
+        try {
+            Book book = bookService.getBookById(id);
+            return new ResponseEntity<>(book.getCategories(), HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>("Book not found: " + e.getMessage(), HttpStatus.NOT_FOUND);
+        }
+    }
+    
+    // Get reviews for a specific book
+    @GetMapping("/books/{id}/reviews")
+    public ResponseEntity<?> getBookReviews(@PathVariable Long id) {
+        try {
+            Book book = bookService.getBookById(id);
+            return new ResponseEntity<>(book.getReviews(), HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>("Book not found: " + e.getMessage(), HttpStatus.NOT_FOUND);
+        }
+    }
+    
+    // Bulk operations - Add multiple categories to a book
+    @PostMapping("/books/{bookId}/categories")
+    public ResponseEntity<?> addCategoriesToBook(@PathVariable Long bookId, @RequestBody List<Long> categoryIds) {
+        try {
+            for (Long categoryId : categoryIds) {
+                bookService.addCategoryToBook(bookId, categoryId);
+            }
+            return new ResponseEntity<>("Categories added successfully", HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>("Error adding categories: " + e.getMessage(), HttpStatus.NOT_FOUND);
+        }
+    }
+    
+    // Remove all categories from a book
+    @DeleteMapping("/books/{bookId}/categories")
+    public ResponseEntity<?> removeAllCategoriesFromBook(@PathVariable Long bookId) {
+        try {
+            Book book = bookService.getBookById(bookId);
+            // Create a copy of categories to avoid concurrent modification
+            var categories = new ArrayList<>(book.getCategories());
+            for (var category : categories) {
+                bookService.removeCategoryFromBook(bookId, category.getId());
+            }
+            return new ResponseEntity<>("All categories removed successfully", HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>("Error removing categories: " + e.getMessage(), HttpStatus.NOT_FOUND);
         }
     }
     
@@ -139,7 +190,7 @@ public class BookController {
         }
     }
     
-    @GetMapping("/books/category/{categoryId}")
+    @GetMapping("/categories/{categoryId}/books")
     public ResponseEntity<?> getBooksByCategory(@PathVariable Long categoryId) {
         try {
             List<Book> books = bookService.getBooksByCategory(categoryId);
@@ -210,6 +261,144 @@ public class BookController {
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>("Error searching for books: " + e.getMessage(), 
+                                      HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    // ================== Additional Comprehensive Endpoints ==================
+    
+    // Get all books with pagination
+    @GetMapping("/books/paged")
+    public ResponseEntity<?> getAllBooksWithPagination(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "title") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        try {
+            Page<Book> books = bookService.searchBooksWithPagination(
+                null, null, null, null, null, null, null, null,
+                page, size, sortBy, direction);
+                
+            Map<String, Object> response = new HashMap<>();
+            response.put("books", books.getContent());
+            response.put("currentPage", books.getNumber());
+            response.put("totalItems", books.getTotalElements());
+            response.put("totalPages", books.getTotalPages());
+            response.put("hasNext", books.hasNext());
+            response.put("hasPrevious", books.hasPrevious());
+                
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error retrieving books: " + e.getMessage(), 
+                                      HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    // Get books by author
+    @GetMapping("/books/author")
+    public ResponseEntity<?> getBooksByAuthor(@RequestParam String author) {
+        try {
+            List<Book> books = bookService.searchBooks(null, author, null);
+            return new ResponseEntity<>(books, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error finding books by author: " + e.getMessage(), 
+                                      HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    // Get books by genre
+    @GetMapping("/books/genre")
+    public ResponseEntity<?> getBooksByGenre(@RequestParam String genre) {
+        try {
+            List<Book> books = bookService.searchBooks(null, null, genre);
+            return new ResponseEntity<>(books, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error finding books by genre: " + e.getMessage(), 
+                                      HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    // Get book statistics/summary
+    @GetMapping("/books/stats")
+    public ResponseEntity<?> getBookStatistics() {
+        try {
+            List<Book> allBooks = bookService.getAllBooks();
+            Map<String, Object> stats = new HashMap<>();
+            
+            stats.put("totalBooks", allBooks.size());
+            stats.put("availableBooks", allBooks.stream().filter(Book::getAvailable).count());
+            stats.put("averagePrice", allBooks.stream().mapToDouble(Book::getPrice).average().orElse(0.0));
+            stats.put("averageRating", allBooks.stream().mapToDouble(Book::getAverageRating).average().orElse(0.0));
+            
+            // Top genres
+            Map<String, Long> genreCount = new HashMap<>();
+            allBooks.forEach(book -> {
+                String genre = book.getGenre();
+                if (genre != null && !genre.trim().isEmpty()) {
+                    genreCount.put(genre, genreCount.getOrDefault(genre, 0L) + 1);
+                }
+            });
+            stats.put("genreDistribution", genreCount);
+            
+            return new ResponseEntity<>(stats, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error calculating statistics: " + e.getMessage(), 
+                                      HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    // Partial update (PATCH) for books
+    @PatchMapping("/books/{id}")
+    public ResponseEntity<?> partialUpdateBook(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        try {
+            Book existingBook = bookService.getBookById(id);
+            
+            // Apply partial updates
+            updates.forEach((key, value) -> {
+                switch (key.toLowerCase()) {
+                    case "title" -> existingBook.setTitle((String) value);
+                    case "author" -> existingBook.setAuthor((String) value);
+                    case "description" -> existingBook.setDescription((String) value);
+                    case "genre" -> existingBook.setGenre((String) value);
+                    case "price" -> existingBook.setPrice(((Number) value).doubleValue());
+                    case "available" -> existingBook.setAvailable((Boolean) value);
+                    case "pages" -> existingBook.setPages(((Number) value).intValue());
+                    case "language" -> existingBook.setLanguage((String) value);
+                    case "publisher" -> existingBook.setPublisher((String) value);
+                    case "publicationyear" -> existingBook.setPublicationYear(((Number) value).intValue());
+                    case "coverimageurl" -> existingBook.setCoverImageUrl((String) value);
+                    case "isbn" -> existingBook.setIsbn((String) value);
+                }
+            });
+            
+            Book updatedBook = bookService.updateBook(id, existingBook);
+            return new ResponseEntity<>(updatedBook, HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>("Book not found: " + e.getMessage(), HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error updating book: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    
+    // Check if a book exists
+    @GetMapping("/books/{id}/exists")
+    public ResponseEntity<?> bookExists(@PathVariable Long id) {
+        try {
+            bookService.getBookById(id);
+            return new ResponseEntity<>(Map.of("exists", true), HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(Map.of("exists", false), HttpStatus.OK);
+        }
+    }
+    
+    // Get books count
+    @GetMapping("/books/count")
+    public ResponseEntity<?> getBooksCount() {
+        try {
+            long count = bookService.getAllBooks().size();
+            return new ResponseEntity<>(Map.of("count", count), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error counting books: " + e.getMessage(), 
                                       HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }

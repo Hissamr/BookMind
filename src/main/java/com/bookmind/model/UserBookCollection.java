@@ -54,4 +54,12 @@ public class UserBookCollection implements BookCollection {
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
 }
