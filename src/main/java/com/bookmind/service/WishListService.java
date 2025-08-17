@@ -66,7 +66,7 @@ public class WishListService {
      */
     public void deleteWishList(Long id) {
         if(!wishListRepository.existsById(id)){
-            throw new RuntimeException("WhisList not found with ID: " + id);
+            throw new RuntimeException("WishList not found with ID: " + id);
         }
         wishListRepository.deleteById(id);
     }
