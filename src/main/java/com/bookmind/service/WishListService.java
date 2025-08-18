@@ -163,8 +163,8 @@ public class WishListService {
                 .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
 
         // Check if book is already in wishlist
-        if (wishList.getBooks().contains(book)) {
-            throw new BookAlreadyInWishListException(request.getBookId(), request.getWishListId());
+        if (!wishList.getBooks().contains(book)) {
+            throw new BookNotInWishListException(request.getBookId(), request.getWishListId());
         }
         
         wishList.removeBook(book);

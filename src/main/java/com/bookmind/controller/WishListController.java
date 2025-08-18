@@ -105,9 +105,9 @@ public class WishListController {
     }
 
     @PostMapping("/wishlists/{wishlistId}/books/{bookId}")
-    public ResponseEntity<?> addBookToWishList(@PathVariable Long userId, @PathVariable Long wishlistId, @PathVariable Long bookId) {
+    public ResponseEntity<?> addBookToWishList(@PathVariable Long userId, @PathVariable Long wishListId, @PathVariable Long bookId) {
         try {
-            AddBookToWishListRequest request = new AddBookToWishListRequest(userId, wishlistId, bookId);
+            AddBookToWishListRequest request = new AddBookToWishListRequest(userId, wishListId, bookId);
             SuccessResponse response = wishListService.addBookToWishList(request);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (RuntimeException e) {
