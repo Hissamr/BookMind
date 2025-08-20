@@ -25,10 +25,14 @@ import com.bookmind.dto.RemoveBookFromWishListRequest;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class WishListService {
     
     private final WishListRepository wishListRepository;
@@ -37,6 +41,8 @@ public class WishListService {
 
     /**
      * Get all the Wishlist of the User from the database.
+     * READ-ONLY: Uses the class-level @Transactional annotation to ensure that the method is read-only.
+     * 
      * @param userId ID of the User
      * @return Wishlist List
      * @throws UserNotFoundException if the User is not found
@@ -51,6 +57,8 @@ public class WishListService {
 
     /**
      * Get a Wishlist by its ID of the User from the database.
+     * READ-ONLY: Uses the class-level @Transactional annotation to ensure that the method is read-only.
+     * 
      * @param userId ID of the User
      * @param wishListId ID of the WishList
      * @return WishList object as WishListResponse DTO
@@ -65,12 +73,21 @@ public class WishListService {
 
     /**
      * Add a new Wishlist to the User database.
+     * WRITE TRANSACTION: Overrides the class-level @Transactional annotation to allow write operations with readOnly = false.
+     * Uses REQUIRED propagation: joins existing transaction or creates a new one if none exists.
+     * 
      * @param userId ID of the User
      * @param wishListRequest WishListRequest object to be saved
      * @return Saved Wishlist object as WishListResponse DTO
      * @throws UserNotFoundException if the User is not found
      * @throws WishListAlreadyExistsException if a Wishlist with the same name already exists
      */
+    @Transactional(
+        readOnly = false,
+        propagation = Propagation.REQUIRED,
+        isolation = Isolation.READ_COMMITTED,
+        rollbackFor = {Exception.class}
+    )
     public WishListResponse addWishListToUser(Long userId,  CreateWishListRequest wishListRequest) {
         User user = userRepository.findById(userId)
                     .orElseThrow(() -> new UserNotFoundException(userId));
@@ -86,6 +103,8 @@ public class WishListService {
 
     /**
      * Update an existing Wishlist in the database.
+     * WRITE TRANSACTION: Multiple database operations that must be atomic
+     * 
      * @param wishListId ID of the Wishlist to be updated
      * @param userId ID of the User who owns the Wishlist
      * @param newName New name for the Wishlist
@@ -93,6 +112,11 @@ public class WishListService {
      * @throws WishListNotFoundException if the Wishlist is not found
      * @throws WishListAlreadyExistsException if a Wishlist with the same name already exists
      */
+    @Transactional(
+        readOnly = false,
+        propagation = Propagation.REQUIRED,
+        rollbackFor = {Exception.class}
+    )
     public WishListResponse updateWishListToUser(UpdateWishListRequest request) {
         WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
                     .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
@@ -107,11 +131,20 @@ public class WishListService {
 
     /**
      * Delete a Wishlist by its ID.
-     * @param wishListId ID of the Wishlist to be deleted   
+     * WRITE TRANSACTION: Involves removing relationships and deleting entity
+     * User REQUIRED propagation with higher isolation level for consistency
+     * 
+     * @param wishListId ID of the Wishlist to be deleted
      * @param userId ID of the User who owns the Wishlist
      * @throws UserNotFoundException if the User is not found
      * @throws WishListNotFoundException if the Wishlist is not found
      */
+    @Transactional(
+        readOnly = false,
+        propagation = Propagation.REQUIRED,
+        isolation = Isolation.REPEATABLE_READ, //Higher isolation for delete operations
+        rollbackFor = {Exception.class}
+    )
     public SuccessResponse deleteWishList(DeleteWishListRequest request) {
         User user = userRepository.findById(request.getUserId())
                     .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
@@ -124,6 +157,8 @@ public class WishListService {
 
     /**
      * Add a Book to a Wishlist.
+     * WRITE TRANSACTION: Modifying wishlist-book relationship
+     *      
      * @param userId ID of the User who owns the Wishlist
      * @param bookId ID of the Book
      * @param wishListId ID of the WishList
@@ -131,6 +166,11 @@ public class WishListService {
      * @throws WishListNotFoundException if the WishList is not found
      * @throws BookAlreadyInWishListException if the Book is already in the wishlist
      */
+    @Transactional(
+        readOnly = false,
+        propagation = Propagation.REQUIRED,
+        rollbackFor = {Exception.class}
+    )
     public SuccessResponse addBookToWishList(AddBookToWishListRequest request) {
         WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
                 .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
@@ -149,6 +189,8 @@ public class WishListService {
 
     /**
      * Remove a Book from a Wishlist.
+     * WRITE TRANSACTION: Modifying wishlist-book relationship
+     * 
      * @param userId ID of the User who owns the Wishlist
      * @param bookId ID of the Book
      * @param wishListId ID of the WishList
@@ -156,6 +198,11 @@ public class WishListService {
      * @throws WishListNotFoundException if the WishList is not found
      * @throws BookNotInWishListException if the Book is not in the wishlist
      */
+    @Transactional(
+        readOnly = false,
+        propagation = Propagation.REQUIRED,
+        rollbackFor = {Exception.class}
+    )
     public SuccessResponse removeBookFromWishList(RemoveBookFromWishListRequest request) {
         WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
                 .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
