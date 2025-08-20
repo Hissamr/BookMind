@@ -24,12 +24,14 @@ import com.bookmind.dto.AddBookToWishListRequest;
 import com.bookmind.dto.RemoveBookFromWishListRequest;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -48,10 +50,13 @@ public class WishListService {
      * @throws UserNotFoundException if the User is not found
      */
     public List<WishListResponse> getAllWishListByUserId(GetUserWishListsRequest request) {
+        log.debug("Fetching all wishlists for user with ID: {}", request.getUserId());
+
         User user = userRepository.findById(request.getUserId())
                     .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
         List<WishList> wishLists = new ArrayList<>(user.getWishlists());
 
+        log.debug("Found {} wishlists for user with ID: {}", wishLists.size(), request.getUserId());
         return WishListMapper.toWishListResponseList(wishLists);
     }
 
@@ -66,8 +71,12 @@ public class WishListService {
      * @throws WishListNotFoundException if the Wishlist is not found
      */
     public WishListResponse getWishListByUserId(GetWishListRequest request) {
+        log.debug("Fetching wishlist with ID: {} for user with ID: {}", request.getWishListId(), request.getUserId());
+
         WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
                     .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+
+        log.debug("Found wishlist with ID: {} for user with ID: {}", request.getWishListId(), request.getUserId());
         return WishListMapper.toWishListResponse(wishList);
     }
 
@@ -89,7 +98,10 @@ public class WishListService {
         rollbackFor = {Exception.class}
     )
     public WishListResponse addWishListToUser(Long userId,  CreateWishListRequest wishListRequest) {
-        User user = userRepository.findById(userId)
+        log.info("Adding new wishlist '{}' for user with ID: {}", wishListRequest.getName(), userId);
+
+        try {
+            User user = userRepository.findById(userId)
                     .orElseThrow(() -> new UserNotFoundException(userId));
         WishList wishList = WishListMapper.toWishList(wishListRequest, user);
         boolean exists = wishListRepository.existsUserByIdAndName(userId, wishList.getName());
@@ -97,8 +109,19 @@ public class WishListService {
             throw new WishListAlreadyExistsException(wishList.getName());
         }
         user.addWishList(wishList);
-        userRepository.save(user);
-        return WishListMapper.toWishListResponse(wishList);
+        User saveUser = userRepository.save(user);
+        WishList savedWishList = saveUser.getWishlists().stream()
+                .filter(wl -> wl.getName().equals(wishList.getName()))
+                .findFirst()
+                .orElseThrow(() -> new WishListNotFoundException("Failed to retrieve saved wishlist"));
+
+        log.info("Successfully added new wishlist with ID:'{}' for user with ID: {}", savedWishList.getId(), userId);
+        return WishListMapper.toWishListResponse(savedWishList);
+        } catch (Exception e) {
+            log.error("Error adding wishlist '{}' for user with ID: {}. Transaction will be rolled back.", wishListRequest.getName(), userId, e);
+            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
+        }
+        
     }
 
     /**
@@ -118,15 +141,26 @@ public class WishListService {
         rollbackFor = {Exception.class}
     )
     public WishListResponse updateWishListToUser(UpdateWishListRequest request) {
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                    .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-        boolean exists = wishListRepository.existsByUserIdAndNameExceptId(request.getUserId(), request.getName(), request.getWishListId());
-        if(exists) {
-            throw new WishListAlreadyExistsException(wishList.getName());
+        log.info("Updating wishlist with ID: {} to name '{}' for user with ID: {}", request.getWishListId(), request.getName(), request.getUserId());
+
+        try {
+            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                        .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+            String oldName = wishList.getName();   
+
+            boolean exists = wishListRepository.existsByUserIdAndNameExceptId(request.getUserId(), request.getName(), request.getWishListId());
+            if(exists) {
+                throw new WishListAlreadyExistsException(wishList.getName());
+            }
+            wishList.setName(request.getName());
+            WishList updatedWishList = wishListRepository.save(wishList);
+            
+            log.info("Successfully updated wishlist with ID: {} from '{}' to '{}' for user with ID: {}", request.getWishListId(), oldName, request.getName(), request.getUserId());
+            return WishListMapper.toWishListResponse(updatedWishList);
+        } catch (Exception e) {
+            log.error("Error updating wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getWishListId(), request.getUserId(), e);
+            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
         }
-        wishList.setName(request.getName());
-        wishListRepository.save(wishList);
-        return WishListMapper.toWishListResponse(wishList);
     }
 
     /**
@@ -146,13 +180,23 @@ public class WishListService {
         rollbackFor = {Exception.class}
     )
     public SuccessResponse deleteWishList(DeleteWishListRequest request) {
-        User user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                    .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-        user.removeWishList(wishList);
-        userRepository.save(user);
-        return new SuccessResponse(true, "WishList deleted successfully");
+        log.info("Deleting wishlist with ID: {} for user with ID: {}", request.getWishListId(), request.getUserId());
+
+        try {
+            User user = userRepository.findById(request.getUserId())
+                        .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
+            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                        .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+            String wishListName = wishList.getName();
+            user.removeWishList(wishList);
+            userRepository.save(user);
+
+            log.info("Successfully deleted wishlist with ID: {} and name '{}' for user with ID: {}", request.getWishListId(), wishListName, request.getUserId());
+            return new SuccessResponse(true, "WishList deleted successfully");
+        } catch (Exception e) {
+            log.error("Error deleting wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getWishListId(), request.getUserId(), e);
+            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
+        }    
     }
 
     /**
@@ -172,19 +216,28 @@ public class WishListService {
         rollbackFor = {Exception.class}
     )
     public SuccessResponse addBookToWishList(AddBookToWishListRequest request) {
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-        Book book = bookRepository.findById(request.getBookId())
-                .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
+        log.info("Adding book with ID: {} to wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
 
-        // Check if book is already in wishlist
-        if (wishList.getBooks().contains(book)) {
-            throw new BookAlreadyInWishListException(request.getBookId(), request.getWishListId());
-        }
-        
-        wishList.addBook(book);
-        wishListRepository.save(wishList);
-        return new SuccessResponse(true, "Book added to WishList successfully");
+        try {
+            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                    .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+            Book book = bookRepository.findById(request.getBookId())
+                    .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
+
+            // Check if book is already in wishlist
+            if (wishList.getBooks().contains(book)) {
+                throw new BookAlreadyInWishListException(request.getBookId(), request.getWishListId());
+            }
+            
+            wishList.addBook(book);
+            wishListRepository.save(wishList);
+
+            log.info("Successfully added book with ID: {} to wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
+            return new SuccessResponse(true, "Book added to WishList successfully");
+        } catch (Exception e) {
+            log.error("Error adding book with ID: {} to wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getBookId(), request.getWishListId(), request.getUserId(), e);
+            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
+        }    
     }
 
     /**
@@ -204,19 +257,28 @@ public class WishListService {
         rollbackFor = {Exception.class}
     )
     public SuccessResponse removeBookFromWishList(RemoveBookFromWishListRequest request) {
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-        Book book = bookRepository.findById(request.getBookId())
-                .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
+        log.info("Removing book with ID: {} from wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
 
-        // Check if book is already in wishlist
-        if (!wishList.getBooks().contains(book)) {
-            throw new BookNotInWishListException(request.getBookId(), request.getWishListId());
-        }
-        
-        wishList.removeBook(book);
-        wishListRepository.save(wishList);
-        return new SuccessResponse(true, "Book removed from WishList successfully");
+        try {
+            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                    .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+            Book book = bookRepository.findById(request.getBookId())
+                    .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
+
+            // Check if book is already in wishlist
+            if (!wishList.getBooks().contains(book)) {
+                throw new BookNotInWishListException(request.getBookId(), request.getWishListId());
+            }
+            
+            wishList.removeBook(book);
+            wishListRepository.save(wishList);
+
+            log.info("Successfully removed book with ID: {} from wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
+            return new SuccessResponse(true, "Book removed from WishList successfully");
+        } catch (Exception e) {
+            log.error("Error removing book with ID: {} from wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getBookId(), request.getWishListId(), request.getUserId(), e);
+            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
+        }    
     }
 
 }
