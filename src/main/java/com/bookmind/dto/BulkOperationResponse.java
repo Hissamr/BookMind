@@ -17,6 +17,7 @@ public class BulkOperationResponse {
     private String message;
     private int totalRequested;
     private int totalProcessed;
+    private int successfullyProcessed;
     private int skipped;
     private int failed;
     private List<BulkOperationDetail> details;
