@@ -157,8 +157,7 @@ public class WishListController {
 
         BulkOperationResponse response = wishListService.removeMultipleBooksFromWishList(serviceRequest);
         HttpStatus status = response.getFailed() > 0 ? HttpStatus.MULTI_STATUS : HttpStatus.OK;
-        return new ResponseEntity<>(response, status);
-                    
+        return new ResponseEntity<>(response, status);            
     }
 
 }
