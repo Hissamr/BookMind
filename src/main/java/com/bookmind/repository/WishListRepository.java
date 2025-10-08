@@ -10,20 +10,11 @@ public interface WishListRepository extends JpaRepository<WishList, Long> {
     // Additional methods for WishList can be defined here if needed
 
     @Query("SELECT w FROM WishList w WHERE w.user.id = :userId AND w.id = :wishlistId")
-    Optional<WishList> findByUserIdAndWishListId(@Param("userId") Long userId, @Param("wishlistId") Long whislistId);
+    Optional<WishList> findByUserIdAndWishListId(@Param("userId") Long userId, @Param("wishlistId") Long wishlistId);
 
-    @Query(value = """ 
-    SELECT COUNT(w) > 0 FROM whisList w
-    WHERE w.user.id = :userId
-    AND LOWER(w.name) = LOWER(:name)
-    """)
+    @Query("SELECT CASE WHEN COUNT(w) > 0 THEN true ELSE false END FROM WishList w WHERE w.user.id = :userId AND LOWER(w.name) = LOWER(:name)")
     boolean existsUserByIdAndName(@Param("userId") Long userId, @Param("name") String name);
 
-    @Query(value = """ 
-    SELECT COUNT(w) > 0 FROM whisList w
-    WHERE w.user.id = :userId
-    AND LOWER(w.name) = LOWER(:name)
-    AND w.id <> :wishlistId
-    """)
-    boolean existsByUserIdAndNameExceptId(@Param("userId") Long userId, @Param("name") String name, @Param("whislistId") Long wishlistId);
+    @Query("SELECT CASE WHEN COUNT(w) > 0 THEN true ELSE false END FROM WishList w WHERE w.user.id = :userId AND LOWER(w.name) = LOWER(:name) AND w.id <> :wishlistId")
+    boolean existsByUserIdAndNameExceptId(@Param("userId") Long userId, @Param("name") String name, @Param("wishlistId") Long wishlistId);
 }

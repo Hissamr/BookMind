@@ -24,13 +24,29 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
-    private String password;
+    @Column
+    private String password; // Nullable for OAuth2 users
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role")
     private Set<String> roles = new HashSet<>();
+
+    // OAuth2 specific fields
+    @Column(name = "provider")
+    private String provider; // google, github, etc.
+    
+    @Column(name = "provider_id")
+    private String providerId; // OAuth2 provider's user ID
+    
+    @Column(name = "picture_url")
+    private String pictureUrl; // Profile picture URL from OAuth2 provider
+    
+    @Column(name = "first_name")
+    private String firstName;
+    
+    @Column(name = "last_name")
+    private String lastName;
 
     private boolean enabled = true;
     private boolean emailVerified = false;

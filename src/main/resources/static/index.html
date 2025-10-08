@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookMind - OAuth2 Login Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .login-button {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .login-button:hover {
+            background: #0056b3;
+        }
+        .google {
+            background: #db4437;
+        }
+        .google:hover {
+            background: #c23321;
+        }
+        .github {
+            background: #333;
+        }
+        .github:hover {
+            background: #24292e;
+        }
+        .api-section {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border: 1px solid #dee2e6;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #e9ecef;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🔐 BookMind OAuth2 Authentication Test</h1>
+    
+    <div class="container">
+        <h2>OAuth2 Login Options</h2>
+        <p>Click one of the buttons below to test OAuth2 authentication:</p>
+        
+        <a href="/oauth2/authorize/google" class="login-button google">
+            📱 Login with Google
+        </a>
+        
+        <a href="/oauth2/authorize/github" class="login-button github">
+            🐙 Login with GitHub
+        </a>
+    </div>
+
+    <div class="api-section">
+        <h3>📡 API Testing</h3>
+        <p>Once logged in, you can test these API endpoints:</p>
+        
+        <h4>Authentication Status</h4>
+        <button onclick="testAuthStatus()">Check Auth Status</button>
+        <div id="auth-status-result"></div>
+        
+        <h4>User Profile</h4>
+        <button onclick="testUserProfile()">Get User Profile</button>
+        <div id="user-profile-result"></div>
+        
+        <h4>Generate JWT Token</h4>
+        <button onclick="generateToken()">Generate JWT Token</button>
+        <div id="token-result"></div>
+        
+        <h4>Test JWT Authentication</h4>
+        <input type="text" id="jwt-token" placeholder="Enter JWT token here" style="width: 300px; padding: 5px;">
+        <button onclick="testJwtAuth()">Test JWT Auth</button>
+        <div id="jwt-test-result"></div>
+    </div>
+
+    <div class="api-section">
+        <h3>📚 Available API Endpoints</h3>
+        <pre>
+GET    /auth/status              - Service status
+GET    /auth/login-urls         - OAuth2 login URLs
+GET    /api/user/me             - Current user profile (requires auth)
+GET    /api/user/auth-status    - Authentication status
+POST   /api/user/token          - Generate JWT token (requires auth)
+POST   /api/user/logout         - Logout
+PUT    /api/user/profile        - Update profile (requires auth)
+GET    /api/books/**            - Book endpoints (public)
+        </pre>
+    </div>
+
+    <script>
+        async function testAuthStatus() {
+            try {
+                const response = await fetch('/api/user/auth-status');
+                const data = await response.json();
+                document.getElementById('auth-status-result').innerHTML = 
+                    '<div class="status ' + (data.authenticated ? 'success' : 'info') + '">' + 
+                    '<pre>' + JSON.stringify(data, null, 2) + '</pre></div>';
+            } catch (error) {
+                document.getElementById('auth-status-result').innerHTML = 
+                    '<div class="status error">Error: ' + error.message + '</div>';
+            }
+        }
+
+        async function testUserProfile() {
+            try {
+                const response = await fetch('/api/user/me');
+                const data = await response.json();
+                const isSuccess = response.status === 200;
+                document.getElementById('user-profile-result').innerHTML = 
+                    '<div class="status ' + (isSuccess ? 'success' : 'error') + '">' + 
+                    '<pre>' + JSON.stringify(data, null, 2) + '</pre></div>';
+            } catch (error) {
+                document.getElementById('user-profile-result').innerHTML = 
+                    '<div class="status error">Error: ' + error.message + '</div>';
+            }
+        }
+
+        async function generateToken() {
+            try {
+                const response = await fetch('/api/user/token', { method: 'POST' });
+                const data = await response.json();
+                const isSuccess = response.status === 200;
+                
+                if (isSuccess) {
+                    document.getElementById('jwt-token').value = data.token;
+                }
+                
+                document.getElementById('token-result').innerHTML = 
+                    '<div class="status ' + (isSuccess ? 'success' : 'error') + '">' + 
+                    '<pre>' + JSON.stringify(data, null, 2) + '</pre></div>';
+            } catch (error) {
+                document.getElementById('token-result').innerHTML = 
+                    '<div class="status error">Error: ' + error.message + '</div>';
+            }
+        }
+
+        async function testJwtAuth() {
+            const token = document.getElementById('jwt-token').value;
+            if (!token) {
+                document.getElementById('jwt-test-result').innerHTML = 
+                    '<div class="status error">Please enter a JWT token first</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/user/me', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                const data = await response.json();
+                const isSuccess = response.status === 200;
+                
+                document.getElementById('jwt-test-result').innerHTML = 
+                    '<div class="status ' + (isSuccess ? 'success' : 'error') + '">' + 
+                    '<p><strong>JWT Authentication Test:</strong></p>' +
+                    '<pre>' + JSON.stringify(data, null, 2) + '</pre></div>';
+            } catch (error) {
+                document.getElementById('jwt-test-result').innerHTML = 
+                    '<div class="status error">JWT Test Error: ' + error.message + '</div>';
+            }
+        }
+
+        // Check authentication status on page load
+        window.onload = function() {
+            testAuthStatus();
+        };
+    </script>
+</body>
+</html>
