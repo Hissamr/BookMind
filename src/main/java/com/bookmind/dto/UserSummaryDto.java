@@ -1,8 +1,8 @@
 package com.bookmind.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import java.time.LocalDateTime;
+import java.util.Set;
 
 /**
  * DTO for representing basic user information in WishList responses
@@ -10,8 +10,12 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class UserSummaryDto {
     private Long id;
     private String username;
     private String email;
+    private boolean emailVerified;
+    private LocalDateTime createdAt;
+    private Set<String> roles;
 }

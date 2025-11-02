@@ -50,11 +50,11 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + accessTokenExpiration);
 
         return Jwts.builder()
-                .setSubject(username)
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
+                .subject(username)
+                .issuedAt(now)
+                .expiration(expiryDate)
                 .claim("type", "access")
-                .signWith(getAccessTokenSigningKey(), SignatureAlgorithm.HS256)
+                .signWith(getAccessTokenSigningKey())
                 .compact();
     }
 
@@ -66,11 +66,11 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + refreshTokenExpiration);
 
         return Jwts.builder()
-                .setSubject(username)
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
+                .subject(username)
+                .issuedAt(now)
+                .expiration(expiryDate)
                 .claim("type", "refresh")
-                .signWith(getRefreshTokenSigningKey(), SignatureAlgorithm.HS256)
+                .signWith(getRefreshTokenSigningKey())
                 .compact();
     }
 

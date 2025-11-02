@@ -9,6 +9,8 @@ import java.time.LocalDateTime;
 @Builder
 public class RegisterResponse {
 
+    private boolean success;
+    private String message;
     private Long userId;
     private String username;
     private String email;

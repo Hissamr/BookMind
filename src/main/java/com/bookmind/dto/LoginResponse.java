@@ -14,7 +14,8 @@ public class LoginResponse {
     @Builder.Default
     private String tokenType = "Bearer";
     private Long expiresIn;
-    
+    private boolean success;
+    private String message;
     private Long userId;
     private String username;
     private String email;
