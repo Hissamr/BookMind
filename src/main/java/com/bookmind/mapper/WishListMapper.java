@@ -82,7 +82,10 @@ public class WishListMapper {
                 .map(u -> new UserSummaryDto(
                         u.getId(),
                         u.getUsername(),
-                        u.getEmail()
+                        u.getEmail(),
+                        u.isEmailVerified(),
+                        u.getCreatedAt(),
+                        u.getRoles()
                 ))
                 .orElse(null);
     }
