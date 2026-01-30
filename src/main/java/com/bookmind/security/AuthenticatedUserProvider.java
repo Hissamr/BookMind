@@ -32,11 +32,12 @@ public class AuthenticatedUserProvider {
 
         Object principal = authentication.getPrincipal();
 
-        if (principal instanceof CustomUserDetails) {
-            return ((CustomUserDetails) principal).getUserId();
+        if (principal instanceof CustomUserDetails userDetails) {
+            return userDetails.getUserId();
         }
 
-        throw new IllegalStateException("Unexpected principal type: " + principal.getClass().getName());
+        String principalType = principal != null ? principal.getClass().getName() : "null";
+        throw new IllegalStateException("Unexpected principal type: " + principalType);
     }
 
     /**
@@ -53,8 +54,8 @@ public class AuthenticatedUserProvider {
 
         Object principal = authentication.getPrincipal();
 
-        if (principal instanceof CustomUserDetails) {
-            return ((CustomUserDetails) principal).getUsername();
+        if (principal instanceof CustomUserDetails userDetails) {
+            return userDetails.getUsername();
         }
 
         return authentication.getName();
@@ -74,10 +75,11 @@ public class AuthenticatedUserProvider {
 
         Object principal = authentication.getPrincipal();
 
-        if (principal instanceof CustomUserDetails) {
-            return (CustomUserDetails) principal;
+        if (principal instanceof CustomUserDetails userDetails) {
+            return userDetails;
         }
 
-        throw new IllegalStateException("Unexpected principal type: " + principal.getClass().getName());
+        String principalType = principal != null ? principal.getClass().getName() : "null";
+        throw new IllegalStateException("Unexpected principal type: " + principalType);
     }
 }
