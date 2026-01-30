@@ -2,6 +2,7 @@ package com.bookmind.service;
 
 import com.bookmind.model.User;
 import com.bookmind.repository.UserRepository;
+import com.bookmind.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -56,16 +57,17 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         log.info("Successfully loaded user: {} with {} authorities", username, authorities.size());
 
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(user.getUsername())
-                .password(user.getPassword())
-                .authorities(authorities)
-                // Account status checks
-                .accountExpired(!user.isEnabled()) // Inverted: not enabled = expired
-                .accountLocked(false) // Can add a locked field if needed
-                .credentialsExpired(false) // Can add credentials expiry field if needed
-                .disabled(!user.isEnabled()) // User must be enabled
-                .build();
+        // Return CustomUserDetails which includes userId for secure access
+        return new CustomUserDetails(
+                user.getId(),
+                user.getUsername(),
+                user.getPassword(),
+                user.isEnabled(),       // enabled
+                true,                    // accountNonExpired
+                true,                    // credentialsNonExpired
+                true,                    // accountNonLocked
+                authorities
+        );
     }
 
     /**
@@ -105,14 +107,15 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
         }
 
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(user.getUsername())
-                .password(user.getPassword())
-                .authorities(authorities)
-                .accountExpired(!user.isEnabled())
-                .accountLocked(false)
-                .credentialsExpired(false)
-                .disabled(!user.isEnabled())
-                .build();
+        return new CustomUserDetails(
+                user.getId(),
+                user.getUsername(),
+                user.getPassword(),
+                user.isEnabled(),
+                true,
+                true,
+                true,
+                authorities
+        );
     }
 }

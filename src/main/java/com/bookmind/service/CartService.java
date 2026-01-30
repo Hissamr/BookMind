@@ -11,17 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 import com.bookmind.dto.AddToCartRequest;
 import com.bookmind.dto.CartItemDto;
 import com.bookmind.dto.CartResponse;
-import com.bookmind.dto.GetCartRequest;
+import com.bookmind.dto.CheckoutResponse;
 import com.bookmind.dto.RemoveFromCartRequest;
 import com.bookmind.dto.UpdateCartItemRequest;
-import com.bookmind.dto.ClearCartRequest;
-import com.bookmind.dto.CheckoutCartRequest;
-import com.bookmind.dto.CheckoutResponse;
 import com.bookmind.exception.BookNotFoundException;
 import com.bookmind.exception.BookNotInCartException;
-import com.bookmind.exception.CartNotFoundException;
-import com.bookmind.exception.CartEmptyException;
 import com.bookmind.exception.CartAlreadyCheckedOutException;
+import com.bookmind.exception.CartEmptyException;
+import com.bookmind.exception.CartNotFoundException;
 import com.bookmind.exception.UserNotFoundException;
 import com.bookmind.model.Book;
 import com.bookmind.model.Cart;
@@ -50,15 +47,16 @@ public class CartService {
 
     /**
      * Get cart for a user
-     * @param request GetCartRequest containing userId
+     * 
+     * @param userId the authenticated user's ID
      * @return CartResponse with cart details
      * @throws CartNotFoundException if cart not found
      */
-    public CartResponse getCart(GetCartRequest request) {
-        log.info("Fetching cart details for user ID: {}", request.getUserId());
-        
-        Cart cart = cartRepository.findByUserId(request.getUserId())
-                .orElseThrow(() -> new CartNotFoundException(request.getUserId()));
+    public CartResponse getCart(Long userId) {
+        log.info("Fetching cart details for user ID: {}", userId);
+
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseGet(() -> getOrCreateCart(userId)); // Create empty cart if doesn't exist
 
         return toCartResponse(cart);
     }
@@ -67,7 +65,8 @@ public class CartService {
      * Add a book to user's cart. Creates cart if it doesn't exist.
      * If book already in cart, increases quantity.
      * 
-     * @param request AddToCartRequest containing userId, bookId, quantity
+     * @param userId the authenticated user's ID
+     * @param request AddToCartRequest containing bookId and quantity
      * @return CartResponse with updated cart details
      */
     @Transactional(
@@ -75,12 +74,12 @@ public class CartService {
         propagation = Propagation.REQUIRED,
         rollbackFor = {Exception.class}
     )
-    public CartResponse addToCart(AddToCartRequest request) {
-        log.info("Adding book ID: {} (qty: {}) to cart for user ID: {}", 
-                request.getBookId(), request.getQuantity(), request.getUserId());
-        
+    public CartResponse addToCart(Long userId, AddToCartRequest request) {
+        log.info("Adding book ID: {} (qty: {}) to cart for user ID: {}",
+                request.getBookId(), request.getQuantity(), userId);
+
         // 1. Get or create cart for user
-        Cart cart = getOrCreateCart(request.getUserId());
+        Cart cart = getOrCreateCart(userId);
 
         // 2. Get the book
         Book book = bookRepository.findById(request.getBookId())
@@ -95,7 +94,7 @@ public class CartService {
             CartItem cartItem = existingItem.get();
             cartItem.setQuantity(cartItem.getQuantity() + request.getQuantity());
             cartItemRepository.save(cartItem);
-            log.info("Updated quantity for book ID: {} in cart. New qty: {}", 
+            log.info("Updated quantity for book ID: {} in cart. New qty: {}",
                     request.getBookId(), cartItem.getQuantity());
         } else {
             // New book - create new CartItem
@@ -139,7 +138,8 @@ public class CartService {
     /**
      * Remove a book from user's cart completely.
      * 
-     * @param request RemoveFromCartRequest containing userId, bookId
+     * @param userId the authenticated user's ID
+     * @param request RemoveFromCartRequest containing bookId
      * @return CartResponse with updated cart details
      * @throws CartNotFoundException if cart not found
      * @throws BookNotInCartException if book not in cart
@@ -149,13 +149,13 @@ public class CartService {
         propagation = Propagation.REQUIRED,
         rollbackFor = {Exception.class}
     )
-    public CartResponse removeFromCart(RemoveFromCartRequest request) {
-        log.info("Removing book ID: {} from cart for user ID: {}", 
-                request.getBookId(), request.getUserId());
-        
+    public CartResponse removeFromCart(Long userId, RemoveFromCartRequest request) {
+        log.info("Removing book ID: {} from cart for user ID: {}",
+                request.getBookId(), userId);
+
         // 1. Get cart (must exist for remove operation)
-        Cart cart = cartRepository.findByUserId(request.getUserId())
-                .orElseThrow(() -> new CartNotFoundException(request.getUserId()));
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new CartNotFoundException(userId));
 
         // 2. Find the cart item
         CartItem cartItem = cartItemRepository
@@ -164,8 +164,8 @@ public class CartService {
 
         // 3. Remove item from cart (orphanRemoval=true will delete from DB)
         cart.removeCartItem(cartItem);
-        log.info("Removed book ID: {} from cart for user ID: {}", 
-                request.getBookId(), request.getUserId());
+        log.info("Removed book ID: {} from cart for user ID: {}",
+                request.getBookId(), userId);
 
         // 4. Recalculate total and save
         cart.recalculateTotalPrice();
@@ -177,7 +177,8 @@ public class CartService {
     /**
      * Update quantity of a book in user's cart.
      * 
-     * @param request UpdateCartItemRequest containing userId, bookId, quantity
+     * @param userId the authenticated user's ID
+     * @param request UpdateCartItemRequest containing bookId and quantity
      * @return CartResponse with updated cart details
      * @throws CartNotFoundException if cart not found
      * @throws BookNotInCartException if book not in cart
@@ -187,12 +188,13 @@ public class CartService {
         propagation = Propagation.REQUIRED,
         rollbackFor = {Exception.class}
     )
-    public CartResponse updateCartItemQuantity(UpdateCartItemRequest request) {
-        log.info("Updating quantity for book ID: {} in cart for user ID: {} to qty: {}", request.getBookId(), request.getUserId(), request.getQuantity());
-        
+    public CartResponse updateCartItemQuantity(Long userId, UpdateCartItemRequest request) {
+        log.info("Updating quantity for book ID: {} in cart for user ID: {} to qty: {}",
+                request.getBookId(), userId, request.getQuantity());
+
         // 1. Get cart (must exist for update operation)
-        Cart cart = cartRepository.findByUserId(request.getUserId())
-                .orElseThrow(() -> new CartNotFoundException(request.getUserId()));
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new CartNotFoundException(userId));
 
         // 2. Find the cart item
         CartItem cartItem = cartItemRepository.findByCartIdAndBookId(cart.getId(), request.getBookId())
@@ -200,7 +202,8 @@ public class CartService {
         
         // 3. Update quantity
         cartItem.setQuantity(request.getQuantity());
-        log.info("Updated quantity for book ID: {} in cart for user ID: {} to qty: {}", request.getBookId(), request.getUserId(), request.getQuantity());
+        log.info("Updated quantity for book ID: {} in cart for user ID: {} to qty: {}",
+                request.getBookId(), userId, request.getQuantity());
 
         cart.recalculateTotalPrice();
         Cart savedCart = cartRepository.save(cart);
@@ -211,7 +214,7 @@ public class CartService {
     /**
      * Clear all items from user's cart.
      * 
-     * @param request ClearCartRequest containing userId
+     * @param userId the authenticated user's ID
      * @return CartResponse with updated (empty) cart details
      * @throws CartNotFoundException if cart not found
      */
@@ -220,16 +223,16 @@ public class CartService {
         propagation = Propagation.REQUIRED,
         rollbackFor = {Exception.class}
     )
-    public CartResponse clearCart(ClearCartRequest request) {
-        log.info("Clearing cart for user ID: {}", request.getUserId());
+    public CartResponse clearCart(Long userId) {
+        log.info("Clearing cart for user ID: {}", userId);
 
         // 1. Get cart (must exist for clear operation)
-        Cart cart = cartRepository.findByUserId(request.getUserId())
-                .orElseThrow(() -> new CartNotFoundException(request.getUserId()));
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new CartNotFoundException(userId));
 
         // 2. Clear all items from the cart
         cart.clearCart();
-        log.info("Cleared all items from cart for user ID: {}", request.getUserId());
+        log.info("Cleared all items from cart for user ID: {}", userId);
         // 3. Save the cleared cart
         Cart savedCart = cartRepository.save(cart);
 
@@ -239,7 +242,7 @@ public class CartService {
     /**
      * Checkout user's cart and create an order.
      * 
-     * @param request CheckoutCartRequest containing userId and shippingAddress
+     * @param userId the authenticated user's ID
      * @return CheckoutResponse with order details
      * @throws CartNotFoundException if cart not found
      * @throws CartEmptyException if cart is empty
@@ -250,33 +253,33 @@ public class CartService {
         propagation = Propagation.REQUIRED,
         rollbackFor = {Exception.class}
     )
-    public CheckoutResponse checkoutCart(CheckoutCartRequest request) {
-        log.info("Checking out cart for user ID: {}", request.getUserId());
+    public CheckoutResponse checkoutCart(Long userId) {
+        log.info("Checking out cart for user ID: {}", userId);
 
         // 1. Get cart (must exist for checkout operation)
-        Cart cart = cartRepository.findByUserId(request.getUserId())
-                .orElseThrow(() -> new CartNotFoundException(request.getUserId()));
-        
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new CartNotFoundException(userId));
+
         // 2. Validate cart is not already checked out
         if (cart.isCheckedOut()) {
-            log.warn("Cart already checked out for user ID: {}", request.getUserId());
+            log.warn("Cart already checked out for user ID: {}", userId);
             throw new CartAlreadyCheckedOutException(cart.getId());
         }
 
         // 3. Validate cart is not empty
         if (cart.getItems().isEmpty()) {
-            log.warn("Cannot checkout an empty cart for user ID: {}", request.getUserId());
-            throw new CartEmptyException(request.getUserId());
+            log.warn("Cannot checkout an empty cart for user ID: {}", userId);
+            throw new CartEmptyException(userId);
         }
 
-        // 4. Create order from cart
-        Order order = orderService.createOrderFromCart(cart, request.getShippingAddress());
+        // 4. Create order from cart (shipping address could come from user profile)
+        Order order = orderService.createOrderFromCart(cart, null);
         log.info("Order created with ID: {} from cart ID: {}", order.getId(), cart.getId());
 
         // 5. Clear the cart (keep cart entity, just remove items)
         cart.clearCart();
         cartRepository.save(cart);
-        log.info("Cart ID: {} cleared after checkout for user ID: {}", cart.getId(), request.getUserId());
+        log.info("Cart ID: {} cleared after checkout for user ID: {}", cart.getId(), userId);
 
         return CheckoutResponse.builder()
                 .success(true)

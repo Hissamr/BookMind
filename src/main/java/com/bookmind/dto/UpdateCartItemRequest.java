@@ -7,14 +7,14 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Request DTO for updating cart item quantity.
+ * Note: userId is NOT included - it comes from the authenticated JWT token.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateCartItemRequest {
-    
-    @Positive(message = "User ID must be positive")
-    @NotNull(message = "User ID cannot be null")
-    private Long userId;
 
     @Positive(message = "Book ID must be positive")
     @NotNull(message = "Book ID cannot be null")
@@ -23,5 +23,5 @@ public class UpdateCartItemRequest {
     @Positive(message = "Quantity must be positive")
     @NotNull(message = "Quantity cannot be null")
     private Integer quantity;
-    
+
 }
