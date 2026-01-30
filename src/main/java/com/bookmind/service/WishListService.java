@@ -101,15 +101,14 @@ public class WishListService {
         isolation = Isolation.READ_COMMITTED,
         rollbackFor = {Exception.class}
     )
-    public WishListResponse addWishListToUser(Long userId,  CreateWishListRequest wishListRequest) {
+    public WishListResponse addWishListToUser(Long userId, CreateWishListRequest wishListRequest) {
         log.info("Adding new wishlist '{}' for user with ID: {}", wishListRequest.getName(), userId);
 
-        try {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new UserNotFoundException(userId));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
         WishList wishList = WishListMapper.toWishList(wishListRequest, user);
         boolean exists = wishListRepository.existsUserByIdAndName(userId, wishList.getName());
-        if(exists) {
+        if (exists) {
             throw new WishListAlreadyExistsException(wishList.getName());
         }
         user.addWishList(wishList);
@@ -121,11 +120,6 @@ public class WishListService {
 
         log.info("Successfully added new wishlist with ID: {} for user with ID: {}", savedWishList.getId(), userId);
         return WishListMapper.toWishListResponse(savedWishList);
-        } catch (Exception e) {
-            log.error("Error adding wishlist '{}' for user with ID: {}. Transaction will be rolled back.", wishListRequest.getName(), userId, e);
-            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
-        }
-        
     }
 
     /**
@@ -147,24 +141,19 @@ public class WishListService {
     public WishListResponse updateWishListToUser(UpdateWishListRequest request) {
         log.info("Updating wishlist with ID: {} to name '{}' for user with ID: {}", request.getWishListId(), request.getName(), request.getUserId());
 
-        try {
-            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                        .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-            String oldName = wishList.getName();   
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        String oldName = wishList.getName();
 
-            boolean exists = wishListRepository.existsByUserIdAndNameExceptId(request.getUserId(), request.getName(), request.getWishListId());
-            if(exists) {
-                throw new WishListAlreadyExistsException(wishList.getName());
-            }
-            wishList.setName(request.getName());
-            WishList updatedWishList = wishListRepository.save(wishList);
-            
-            log.info("Successfully updated wishlist with ID: {} from '{}' to '{}' for user with ID: {}", request.getWishListId(), oldName, request.getName(), request.getUserId());
-            return WishListMapper.toWishListResponse(updatedWishList);
-        } catch (Exception e) {
-            log.error("Error updating wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getWishListId(), request.getUserId(), e);
-            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
+        boolean exists = wishListRepository.existsByUserIdAndNameExceptId(request.getUserId(), request.getName(), request.getWishListId());
+        if (exists) {
+            throw new WishListAlreadyExistsException(wishList.getName());
         }
+        wishList.setName(request.getName());
+        WishList updatedWishList = wishListRepository.save(wishList);
+
+        log.info("Successfully updated wishlist with ID: {} from '{}' to '{}' for user with ID: {}", request.getWishListId(), oldName, request.getName(), request.getUserId());
+        return WishListMapper.toWishListResponse(updatedWishList);
     }
 
     /**
@@ -186,21 +175,16 @@ public class WishListService {
     public SuccessResponse deleteWishList(DeleteWishListRequest request) {
         log.info("Deleting wishlist with ID: {} for user with ID: {}", request.getWishListId(), request.getUserId());
 
-        try {
-            User user = userRepository.findById(request.getUserId())
-                        .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
-            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                        .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-            String wishListName = wishList.getName();
-            user.removeWishList(wishList);
-            userRepository.save(user);
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        String wishListName = wishList.getName();
+        user.removeWishList(wishList);
+        userRepository.save(user);
 
-            log.info("Successfully deleted wishlist with ID: {} and name '{}' for user with ID: {}", request.getWishListId(), wishListName, request.getUserId());
-            return new SuccessResponse(true, "WishList deleted successfully");
-        } catch (Exception e) {
-            log.error("Error deleting wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getWishListId(), request.getUserId(), e);
-            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
-        }    
+        log.info("Successfully deleted wishlist with ID: {} and name '{}' for user with ID: {}", request.getWishListId(), wishListName, request.getUserId());
+        return new SuccessResponse(true, "WishList deleted successfully");
     }
 
     /**
@@ -222,26 +206,21 @@ public class WishListService {
     public SuccessResponse addBookToWishList(AddBookToWishListRequest request) {
         log.info("Adding book with ID: {} to wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
 
-        try {
-            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                    .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-            Book book = bookRepository.findById(request.getBookId())
-                    .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        Book book = bookRepository.findById(request.getBookId())
+                .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
 
-            // Check if book is already in wishlist
-            if (wishList.getBooks().contains(book)) {
-                throw new BookAlreadyInWishListException(request.getBookId(), request.getWishListId());
-            }
-            
-            wishList.addBook(book);
-            wishListRepository.save(wishList);
+        // Check if book is already in wishlist
+        if (wishList.getBooks().contains(book)) {
+            throw new BookAlreadyInWishListException(request.getBookId(), request.getWishListId());
+        }
 
-            log.info("Successfully added book with ID: {} to wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
-            return new SuccessResponse(true, "Book added to WishList successfully");
-        } catch (Exception e) {
-            log.error("Error adding book with ID: {} to wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getBookId(), request.getWishListId(), request.getUserId(), e);
-            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
-        }    
+        wishList.addBook(book);
+        wishListRepository.save(wishList);
+
+        log.info("Successfully added book with ID: {} to wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
+        return new SuccessResponse(true, "Book added to WishList successfully");
     }
 
     /**
@@ -263,26 +242,21 @@ public class WishListService {
     public SuccessResponse removeBookFromWishList(RemoveBookFromWishListRequest request) {
         log.info("Removing book with ID: {} from wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
 
-        try {
-            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                    .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-            Book book = bookRepository.findById(request.getBookId())
-                    .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        Book book = bookRepository.findById(request.getBookId())
+                .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
 
-            // Check if book is already in wishlist
-            if (!wishList.getBooks().contains(book)) {
-                throw new BookNotInWishListException(request.getBookId(), request.getWishListId());
-            }
-            
-            wishList.removeBook(book);
-            wishListRepository.save(wishList);
+        // Check if book is in wishlist
+        if (!wishList.getBooks().contains(book)) {
+            throw new BookNotInWishListException(request.getBookId(), request.getWishListId());
+        }
 
-            log.info("Successfully removed book with ID: {} from wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
-            return new SuccessResponse(true, "Book removed from WishList successfully");
-        } catch (Exception e) {
-            log.error("Error removing book with ID: {} from wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getBookId(), request.getWishListId(), request.getUserId(), e);
-            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
-        }    
+        wishList.removeBook(book);
+        wishListRepository.save(wishList);
+
+        log.info("Successfully removed book with ID: {} from wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
+        return new SuccessResponse(true, "Book removed from WishList successfully");
     }
 
     /**
@@ -308,73 +282,65 @@ public class WishListService {
         List<BulkOperationDetail> details = new ArrayList<>();
         int successCount = 0, skippedCount = 0, failedCount = 0;
 
-        try {
-            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                    .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
 
-            for (Long bookId : request.getBookIds()) {
-                BulkOperationDetail detail = BulkOperationDetail.builder().bookId(bookId).build();
-                
-                try {
-                    Book book = bookRepository.findById(bookId)
-                            .orElseThrow(() -> new BookNotFoundException(bookId));
+        for (Long bookId : request.getBookIds()) {
+            BulkOperationDetail detail = BulkOperationDetail.builder().bookId(bookId).build();
 
-                    detail.setBookDescription(book.getTitle());
+            try {
+                Book book = bookRepository.findById(bookId)
+                        .orElseThrow(() -> new BookNotFoundException(bookId));
 
-                    if (wishList.getBooks().contains(book)) {
-                        detail.setStatus("SKIPPED");
-                        detail.setReason("Book already exists in WishList");
-                        skippedCount++;
-                        log.debug("Book with ID: {} already exists in wishlist with ID: {} for user with ID: {}, skipping", bookId, request.getWishListId(), request.getUserId());
-                    } else {
-                        wishList.addBook(book);
-                        detail.setStatus("SUCCESS");
-                        detail.setReason("Book added successfully");
-                        successCount++;
-                        log.debug("Successfully added book with ID: {} to wishlist with ID: {} for user with ID: {}", bookId, request.getWishListId(), request.getUserId());
-                    }
-                } catch (BookNotFoundException e) {
-                    detail.setStatus("FAILED");
-                    detail.setReason("Book not found");
-                    detail.setBookDescription("Unknown Book"); 
-                    failedCount++;
-                    log.warn("Book with ID: {} not found, marking as failed", bookId);
-                } catch (Exception e) {
-                    detail.setStatus("FAILED");
-                    detail.setReason("Unexpected error: " + e.getMessage());
-                    failedCount++;
-                    log.warn("Unexpected error occurred while processing book with ID: {}", bookId, e);
+                detail.setBookDescription(book.getTitle());
+
+                if (wishList.getBooks().contains(book)) {
+                    detail.setStatus("SKIPPED");
+                    detail.setReason("Book already exists in WishList");
+                    skippedCount++;
+                    log.debug("Book with ID: {} already exists in wishlist with ID: {} for user with ID: {}, skipping", bookId, request.getWishListId(), request.getUserId());
+                } else {
+                    wishList.addBook(book);
+                    detail.setStatus("SUCCESS");
+                    detail.setReason("Book added successfully");
+                    successCount++;
+                    log.debug("Successfully added book with ID: {} to wishlist with ID: {} for user with ID: {}", bookId, request.getWishListId(), request.getUserId());
                 }
-                details.add(detail);
+            } catch (BookNotFoundException e) {
+                detail.setStatus("FAILED");
+                detail.setReason("Book not found");
+                detail.setBookDescription("Unknown Book");
+                failedCount++;
+                log.warn("Book with ID: {} not found, marking as failed", bookId);
+            } catch (RuntimeException e) {
+                detail.setStatus("FAILED");
+                detail.setReason("Unexpected error: " + e.getMessage());
+                failedCount++;
+                log.warn("Unexpected error occurred while processing book with ID: {}", bookId, e);
             }
-
-            if (successCount > 0) {
-                wishListRepository.save(wishList);
-                log.info("Successfully added {} books to wishlist with ID: {} for user with ID: {}", successCount, request.getWishListId(), request.getUserId());
-            }
-
-            BulkOperationResponse response = BulkOperationResponse.builder()
-                    .success(successCount > 0 || (skippedCount > 0 && failedCount == 0))
-                    .message(String.format("Processed %d books: %d added, %d skipped, %d failed", 
-                            request.getBookIds().size(), successCount, skippedCount, failedCount))
-                    .totalRequested(request.getBookIds().size())
-                    .successfullyProcessed(successCount)
-                    .skipped(skippedCount)
-                    .failed(failedCount)
-                    .details(details)
-                    .build();
-
-            log.info("Bulk add operation completed: {} out of {} books processed successfully", 
-                    successCount, request.getBookIds().size());
-                    
-             return response;       
-        } catch (WishListNotFoundException e) {
-            log.error("WishList not found for bulk add operation: {}", e.getMessage());
-            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
-        } catch (Exception e) {
-            log.error("Error during bulk add operation for wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getWishListId(), request.getUserId(), e);
-            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
+            details.add(detail);
         }
+
+        if (successCount > 0) {
+            wishListRepository.save(wishList);
+            log.info("Successfully added {} books to wishlist with ID: {} for user with ID: {}", successCount, request.getWishListId(), request.getUserId());
+        }
+
+        BulkOperationResponse response = BulkOperationResponse.builder()
+                .success(successCount > 0 || (skippedCount > 0 && failedCount == 0))
+                .message(String.format("Processed %d books: %d added, %d skipped, %d failed",
+                        request.getBookIds().size(), successCount, skippedCount, failedCount))
+                .totalRequested(request.getBookIds().size())
+                .successfullyProcessed(successCount)
+                .skipped(skippedCount)
+                .failed(failedCount)
+                .details(details)
+                .build();
+
+        log.info("Bulk add operation completed: {} out of {} books processed successfully",
+                successCount, request.getBookIds().size());
+
+        return response;
     }
 
     /**
@@ -400,68 +366,60 @@ public class WishListService {
         List<BulkOperationDetail> details = new ArrayList<>();
         int successCount = 0, skippedCount = 0, failedCount = 0;
 
-        try {
-            WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                    .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-            
-            for(Long bookId : request.getBookIds()) {
-                BulkOperationDetail detail = BulkOperationDetail.builder().bookId(bookId).build();
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
+                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
 
-                try {
-                    Book book = bookRepository.findById(bookId)
-                            .orElseThrow(() -> new BookNotFoundException(bookId));
+        for (Long bookId : request.getBookIds()) {
+            BulkOperationDetail detail = BulkOperationDetail.builder().bookId(bookId).build();
 
-                    detail.setBookDescription(book.getTitle());
+            try {
+                Book book = bookRepository.findById(bookId)
+                        .orElseThrow(() -> new BookNotFoundException(bookId));
 
-                    if(!wishList.getBooks().contains(book)) {
-                        detail.setStatus("SKIPPED");
-                        detail.setReason("Book not in wishlist");
-                        skippedCount++;
-                    } else {
-                        wishList.removeBook(book);
-                        detail.setStatus("SUCCESS");
-                        detail.setReason("Book removed successfully");
-                        successCount++;
-                    }
-                } catch (BookNotFoundException e) {
-                    detail.setStatus("FAILED");
-                    detail.setReason("Book not found");
-                    detail.setBookDescription("Unknown book");
-                    failedCount++;
-                } catch (Exception e) {
-                    detail.setStatus("FAILED");
-                    detail.setReason("Unexpected error: " + e.getMessage());
-                    failedCount++;
+                detail.setBookDescription(book.getTitle());
+
+                if (!wishList.getBooks().contains(book)) {
+                    detail.setStatus("SKIPPED");
+                    detail.setReason("Book not in wishlist");
+                    skippedCount++;
+                } else {
+                    wishList.removeBook(book);
+                    detail.setStatus("SUCCESS");
+                    detail.setReason("Book removed successfully");
+                    successCount++;
                 }
-                details.add(detail);
+            } catch (BookNotFoundException e) {
+                detail.setStatus("FAILED");
+                detail.setReason("Book not found");
+                detail.setBookDescription("Unknown book");
+                failedCount++;
+            } catch (RuntimeException e) {
+                detail.setStatus("FAILED");
+                detail.setReason("Unexpected error: " + e.getMessage());
+                failedCount++;
             }
-
-            if (successCount > 0) {
-                wishListRepository.save(wishList);
-            }
-
-            BulkOperationResponse response = BulkOperationResponse.builder()
-                    .success(successCount > 0 || (skippedCount > 0 && failedCount == 0))
-                    .message(String.format("Processed %d books: %d removed, %d skipped, %d failed", 
-                            request.getBookIds().size(), successCount, skippedCount, failedCount))
-                    .totalRequested(request.getBookIds().size())
-                    .successfullyProcessed(successCount)
-                    .skipped(skippedCount)
-                    .failed(failedCount)
-                    .details(details)
-                    .build();
-
-            log.info("Bulk remove operation completed: {} out of {} books processed successfully", 
-                    successCount, request.getBookIds().size());
-
-            return response;
-        } catch (WishListNotFoundException e) {
-            log.error("WishList not found for bulk remove operation: {}", e.getMessage());
-            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
-        } catch (Exception e) {
-            log.error("Error during bulk remove operation for wishlist with ID: {} for user with ID: {}. Transaction will be rolled back.", request.getWishListId(), request.getUserId(), e);
-            throw e; // Let the transaction manager handle the rollback (Re-throw to trigger rollback)
+            details.add(detail);
         }
+
+        if (successCount > 0) {
+            wishListRepository.save(wishList);
+        }
+
+        BulkOperationResponse response = BulkOperationResponse.builder()
+                .success(successCount > 0 || (skippedCount > 0 && failedCount == 0))
+                .message(String.format("Processed %d books: %d removed, %d skipped, %d failed",
+                        request.getBookIds().size(), successCount, skippedCount, failedCount))
+                .totalRequested(request.getBookIds().size())
+                .successfullyProcessed(successCount)
+                .skipped(skippedCount)
+                .failed(failedCount)
+                .details(details)
+                .build();
+
+        log.info("Bulk remove operation completed: {} out of {} books processed successfully",
+                successCount, request.getBookIds().size());
+
+        return response;
     }
 
 }
