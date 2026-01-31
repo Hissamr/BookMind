@@ -9,15 +9,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.bookmind.dto.OrderItemDto;
 import com.bookmind.dto.OrderResponse;
-import com.bookmind.dto.GetOrderRequest;
-import com.bookmind.dto.GetUserOrdersRequest;
+import com.bookmind.exception.OrderNotFoundException;
 import com.bookmind.model.Cart;
 import com.bookmind.model.CartItem;
 import com.bookmind.model.Order;
 import com.bookmind.model.OrderItem;
-import com.bookmind.repository.OrderRepository;
 import com.bookmind.model.OrderStatus;
-import com.bookmind.exception.OrderNotFoundException;
+import com.bookmind.repository.OrderRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class OrderService {
-    
+
     private final OrderRepository orderRepository;
 
     /**
@@ -35,7 +33,7 @@ public class OrderService {
      * 
      * @param cart The cart to convert to an order
      * @param shippingAddress The shipping address for the order
-     * @return OrderResponse with the created order details
+     * @return Order entity
      */
     @Transactional(
         readOnly = false,
@@ -58,7 +56,7 @@ public class OrderService {
 
         // 3. Save and return
         Order savedOrder = orderRepository.save(order);
-        log.info("Order created successfully with ID: {} for user ID: {}", 
+        log.info("Order created successfully with ID: {} for user ID: {}",
                 savedOrder.getId(), savedOrder.getUser().getId());
 
         return savedOrder;
@@ -66,53 +64,53 @@ public class OrderService {
 
     /**
      * Convert a CartItem to an OrderItem
-     * 
-     * @param cartItem The cart item to convert
-     * @return OrderItem with the same book, quantity, and price
      */
     private OrderItem convertToOrderItem(CartItem cartItem) {
         OrderItem orderItem = new OrderItem();
         orderItem.setBook(cartItem.getBook());
         orderItem.setQuantity(cartItem.getQuantity());
-        orderItem.setPrice(cartItem.getPrice());  // Use cart's snapshot price
+        orderItem.setPrice(cartItem.getPrice());
         return orderItem;
     }
 
     /**
      * Fetch an order by its ID for a specific user
      * 
-     * @param request The request containing userId and orderId
+     * @param userId The authenticated user's ID
+     * @param orderId The order ID to fetch
      * @return OrderResponse with the order details
      * @throws OrderNotFoundException if the order is not found
      */
-    public OrderResponse getOrderById(GetOrderRequest request) {
-        log.info("Fetching order with ID: {} for user ID: {}", request.getOrderId(), request.getUserId());
+    public OrderResponse getOrderById(Long userId, Long orderId) {
+        log.info("Fetching order with ID: {} for user ID: {}", orderId, userId);
 
-            Order order = orderRepository.findByUserIdAndId(request.getUserId(), request.getOrderId())
+        Order order = orderRepository.findByUserIdAndId(userId, orderId)
                 .orElseThrow(() -> new OrderNotFoundException(
-                        "Order not found with ID: " + request.getOrderId() + " for user ID: " + request.getUserId()));
-        
+                        "Order not found with ID: " + orderId + " for user ID: " + userId));
+
         log.info("Order found with ID: {} for user ID: {}", order.getId(), order.getUser().getId());
 
         return toOrderResponse(order);
     }
 
     /**
-     * Fetch all orders for a specific user
+     * Fetch all orders for a specific user, optionally filtered by status
      * 
-     * @param request The request containing the userId
+     * @param userId The authenticated user's ID
+     * @param status Optional status filter (can be null)
      * @return List of OrderResponse with the user's orders
      */
-    public List<OrderResponse> getOrdersByUserId(GetUserOrdersRequest request) {
-        log.info("Fetching orders for user ID: {}", request.getUserId());
+    public List<OrderResponse> getOrdersByUserId(Long userId, String status) {
+        log.info("Fetching orders for user ID: {} with status filter: {}", userId, status);
 
-        if(request.getStatus() != null) {
-            return getOrdersByUserIdAndStatus(request.getUserId(), request.getStatus());
+        List<Order> orders;
+        if (status != null && !status.isBlank()) {
+            orders = orderRepository.findByUserIdAndStatus(userId, status);
+        } else {
+            orders = orderRepository.findByUserId(userId);
         }
 
-        List<Order> orders = orderRepository.findByUserId(request.getUserId());
-
-        log.info("Found {} orders for user ID: {}", orders.size(), request.getUserId());
+        log.info("Found {} orders for user ID: {}", orders.size(), userId);
 
         return orders.stream()
                 .map(this::toOrderResponse)
@@ -120,18 +118,60 @@ public class OrderService {
     }
 
     /**
-     * Fetch orders for a user filtered by status
+     * Cancel an order (user can only cancel PENDING orders)
      * 
-     * @param userId The ID of the user
-     * @param status The status to filter orders by
-     * @return List of OrderResponse with the filtered orders
+     * @param userId The authenticated user's ID
+     * @param orderId The order ID to cancel
+     * @return OrderResponse with the cancelled order
+     * @throws OrderNotFoundException if order not found or doesn't belong to user
+     * @throws IllegalStateException if order is not in PENDING status
      */
-    public List<OrderResponse> getOrdersByUserIdAndStatus(Long userId, String status) {
-        log.info("Fetching orders for user ID: {} with status: {}", userId, status);
+    @Transactional(
+        readOnly = false,
+        propagation = Propagation.REQUIRED,
+        rollbackFor = {Exception.class}
+    )
+    public OrderResponse cancelOrder(Long userId, Long orderId) {
+        log.info("Cancelling order ID: {} for user ID: {}", orderId, userId);
 
-        List<Order> orders = orderRepository.findByUserIdAndStatus(userId, status);
+        // 1. Find the order (must belong to user)
+        Order order = orderRepository.findByUserIdAndId(userId, orderId)
+                .orElseThrow(() -> new OrderNotFoundException(
+                        "Order not found with ID: " + orderId + " for user ID: " + userId));
 
-        log.info("Found {} orders for user ID: {} with status: {}", orders.size(), userId, status);
+        // 2. Only PENDING orders can be cancelled
+        if (order.getStatus() != OrderStatus.PENDING) {
+            log.warn("Cannot cancel order ID: {} - status is {}", orderId, order.getStatus());
+            throw new IllegalStateException(
+                    "Cannot cancel order. Only PENDING orders can be cancelled. Current status: " + order.getStatus());
+        }
+
+        // 3. Update status to CANCELLED
+        order.setStatus(OrderStatus.CANCELLED);
+        Order savedOrder = orderRepository.save(order);
+
+        log.info("Order ID: {} cancelled successfully for user ID: {}", orderId, userId);
+
+        return toOrderResponse(savedOrder);
+    }
+
+    /**
+     * Get all orders (Admin only), optionally filtered by status
+     * 
+     * @param status Optional status filter (can be null)
+     * @return List of all OrderResponse
+     */
+    public List<OrderResponse> getAllOrders(String status) {
+        log.info("Admin fetching all orders with status filter: {}", status);
+
+        List<Order> orders;
+        if (status != null && !status.isBlank()) {
+            orders = orderRepository.findByStatus(status);
+        } else {
+            orders = orderRepository.findAll();
+        }
+
+        log.info("Found {} total orders", orders.size());
 
         return orders.stream()
                 .map(this::toOrderResponse)
@@ -165,7 +205,7 @@ public class OrderService {
             status = OrderStatus.valueOf(newStatus.toUpperCase());
         } catch (IllegalArgumentException e) {
             log.error("Invalid order status: {}", newStatus);
-            throw new IllegalArgumentException("Invalid order status: " + newStatus + 
+            throw new IllegalArgumentException("Invalid order status: " + newStatus +
                     ". Valid values are: " + java.util.Arrays.toString(OrderStatus.values()));
         }
 
@@ -182,11 +222,8 @@ public class OrderService {
 
     /**
      * Convert Order entity to OrderResponse DTO
-     * 
-     * @param order The order entity to convert
-     * @return OrderResponse DTO
      */
-    public OrderResponse toOrderResponse(Order order) {
+    private OrderResponse toOrderResponse(Order order) {
         List<OrderItemDto> itemDtos = order.getItems().stream()
                 .map(this::toOrderItemDto)
                 .collect(Collectors.toList());
@@ -205,9 +242,6 @@ public class OrderService {
 
     /**
      * Convert OrderItem entity to OrderItemDto
-     * 
-     * @param orderItem The order item entity to convert
-     * @return OrderItemDto DTO
      */
     private OrderItemDto toOrderItemDto(OrderItem orderItem) {
         return OrderItemDto.builder()
@@ -219,5 +253,4 @@ public class OrderService {
                 .totalPrice(orderItem.getPrice() * orderItem.getQuantity())
                 .build();
     }
-
 }
