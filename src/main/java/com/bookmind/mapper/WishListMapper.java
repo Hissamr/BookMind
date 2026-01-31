@@ -1,20 +1,18 @@
 package com.bookmind.mapper;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
 import com.bookmind.dto.BookSummaryDto;
-import com.bookmind.dto.CreateWishListRequest;
-import com.bookmind.dto.UpdateWishListRequest;
 import com.bookmind.dto.UserSummaryDto;
 import com.bookmind.dto.WishListResponse;
 import com.bookmind.dto.WishListSummaryDto;
 import com.bookmind.model.Book;
 import com.bookmind.model.User;
 import com.bookmind.model.WishList;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Utility class for mapping between WishList entities and DTOs
@@ -110,69 +108,6 @@ public class WishListMapper {
                         b.getIsbn()
                 ))
                 .orElse(null);
-    }
-    
-    /**
-     * Convert CreateWishListRequest to WishList entity
-     * 
-     * @param request the request containing wishlist creation data
-     * @param user the user who owns the wishlist
-     * @return a new WishList entity populated with data from the request
-     * @throws IllegalArgumentException if user is null
-     */
-    public static WishList toWishList(CreateWishListRequest request, User user) {
-        if (request == null) {
-            return null;
-        }
-        
-        Objects.requireNonNull(user, "User cannot be null when creating a wishlist");
-        
-        WishList wishList = new WishList();
-        wishList.setName(request.getName());
-        wishList.setUser(user);
-        return wishList;
-    }
-    
-    /**
-     * Immutable parameters class for wishlist updates
-     */
-    public static final class UpdateWishListParams {
-        public final Long userId;
-        public final Long wishListId;
-        public final String newName;
-        
-        private UpdateWishListParams(UpdateWishListRequest request) {
-            this.userId = request.getUserId();
-            this.wishListId = request.getWishListId();
-            this.newName = request.getName();
-        }
-        
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            UpdateWishListParams that = (UpdateWishListParams) o;
-            return Objects.equals(userId, that.userId) &&
-                   Objects.equals(wishListId, that.wishListId) &&
-                   Objects.equals(newName, that.newName);
-        }
-        
-        @Override
-        public int hashCode() {
-            return Objects.hash(userId, wishListId, newName);
-        }
-    }
-    
-    /**
-     * Extract parameters from UpdateWishListRequest
-     * 
-     * @param request the update request to extract parameters from
-     * @return a parameter object containing the extracted values
-     * @throws NullPointerException if request is null
-     */
-    public static UpdateWishListParams extractUpdateParams(UpdateWishListRequest request) {
-        Objects.requireNonNull(request, "UpdateWishListRequest cannot be null");
-        return new UpdateWishListParams(request);
     }
     
     /**

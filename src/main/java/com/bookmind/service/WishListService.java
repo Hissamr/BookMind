@@ -1,5 +1,17 @@
 package com.bookmind.service;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.bookmind.dto.BulkOperationDetail;
+import com.bookmind.dto.BulkOperationResponse;
+import com.bookmind.dto.SuccessResponse;
+import com.bookmind.dto.WishListResponse;
 import com.bookmind.exception.BookAlreadyInWishListException;
 import com.bookmind.exception.BookNotFoundException;
 import com.bookmind.exception.BookNotInWishListException;
@@ -7,93 +19,70 @@ import com.bookmind.exception.UserNotFoundException;
 import com.bookmind.exception.WishListAlreadyExistsException;
 import com.bookmind.exception.WishListNotFoundException;
 import com.bookmind.mapper.WishListMapper;
-import com.bookmind.model.WishList;
 import com.bookmind.model.Book;
 import com.bookmind.model.User;
+import com.bookmind.model.WishList;
 import com.bookmind.repository.BookRepository;
-import com.bookmind.repository.WishListRepository;
 import com.bookmind.repository.UserRepository;
-import com.bookmind.dto.SuccessResponse;
-import com.bookmind.dto.WishListResponse;
-import com.bookmind.dto.GetUserWishListsRequest;
-import com.bookmind.dto.GetWishListRequest;
-import com.bookmind.dto.CreateWishListRequest;
-import com.bookmind.dto.UpdateWishListRequest;
-import com.bookmind.dto.DeleteWishListRequest;
-import com.bookmind.dto.AddBookToWishListRequest;
-import com.bookmind.dto.BulkAddBooksToWishListRequest;
-import com.bookmind.dto.BulkOperationDetail;
-import com.bookmind.dto.BulkOperationResponse;
-import com.bookmind.dto.BulkRemoveBookFromWishListRequest;
-import com.bookmind.dto.RemoveBookFromWishListRequest;
+import com.bookmind.repository.WishListRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Propagation;
-import java.util.*;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WishListService {
-    
+
     private final WishListRepository wishListRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
 
     /**
-     * Get all the Wishlist of the User from the database.
-     * READ-ONLY: Uses the class-level @Transactional annotation to ensure that the method is read-only.
+     * Get all wishlists for a user.
      * 
-     * @param userId ID of the User
-     * @return Wishlist List
-     * @throws UserNotFoundException if the User is not found
+     * @param userId the authenticated user's ID
+     * @return List of WishListResponse DTOs
+     * @throws UserNotFoundException if the user is not found
      */
-    public List<WishListResponse> getAllWishListByUserId(GetUserWishListsRequest request) {
-        log.debug("Fetching all wishlists for user with ID: {}", request.getUserId());
+    public List<WishListResponse> getAllWishListsByUserId(Long userId) {
+        log.debug("Fetching all wishlists for user with ID: {}", userId);
 
-        User user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
         List<WishList> wishLists = new ArrayList<>(user.getWishlists());
 
-        log.debug("Found {} wishlists for user with ID: {}", wishLists.size(), request.getUserId());
+        log.debug("Found {} wishlists for user with ID: {}", wishLists.size(), userId);
         return WishListMapper.toWishListResponseList(wishLists);
     }
 
     /**
-     * Get a Wishlist by its ID of the User from the database.
-     * READ-ONLY: Uses the class-level @Transactional annotation to ensure that the method is read-only.
+     * Get a specific wishlist by ID.
      * 
-     * @param userId ID of the User
-     * @param wishListId ID of the WishList
-     * @return WishList object as WishListResponse DTO
-     * @throws UserNotFoundException if the User is not found
-     * @throws WishListNotFoundException if the Wishlist is not found
+     * @param userId the authenticated user's ID
+     * @param wishListId the wishlist ID
+     * @return WishListResponse DTO
+     * @throws WishListNotFoundException if the wishlist is not found
      */
-    public WishListResponse getWishListByUserId(GetWishListRequest request) {
-        log.debug("Fetching wishlist with ID: {} for user with ID: {}", request.getWishListId(), request.getUserId());
+    public WishListResponse getWishListById(Long userId, Long wishListId) {
+        log.debug("Fetching wishlist with ID: {} for user with ID: {}", wishListId, userId);
 
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                    .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(userId, wishListId)
+                .orElseThrow(() -> new WishListNotFoundException(wishListId));
 
-        log.debug("Found wishlist with ID: {} for user with ID: {}", request.getWishListId(), request.getUserId());
+        log.debug("Found wishlist with ID: {} for user with ID: {}", wishListId, userId);
         return WishListMapper.toWishListResponse(wishList);
     }
 
     /**
-     * Add a new Wishlist to the User database.
-     * WRITE TRANSACTION: Overrides the class-level @Transactional annotation to allow write operations with readOnly = false.
-     * Uses REQUIRED propagation: joins existing transaction or creates a new one if none exists.
+     * Create a new wishlist for a user.
      * 
-     * @param userId ID of the User
-     * @param wishListRequest WishListRequest object to be saved
-     * @return Saved Wishlist object as WishListResponse DTO
-     * @throws UserNotFoundException if the User is not found
-     * @throws WishListAlreadyExistsException if a Wishlist with the same name already exists
+     * @param userId the authenticated user's ID
+     * @param name the wishlist name
+     * @return WishListResponse DTO
+     * @throws UserNotFoundException if the user is not found
+     * @throws WishListAlreadyExistsException if a wishlist with the same name exists
      */
     @Transactional(
         readOnly = false,
@@ -101,191 +90,197 @@ public class WishListService {
         isolation = Isolation.READ_COMMITTED,
         rollbackFor = {Exception.class}
     )
-    public WishListResponse addWishListToUser(Long userId, CreateWishListRequest wishListRequest) {
-        log.info("Adding new wishlist '{}' for user with ID: {}", wishListRequest.getName(), userId);
+    public WishListResponse createWishList(Long userId, String name) {
+        log.info("Creating new wishlist '{}' for user with ID: {}", name, userId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
-        WishList wishList = WishListMapper.toWishList(wishListRequest, user);
-        boolean exists = wishListRepository.existsUserByIdAndName(userId, wishList.getName());
+
+        boolean exists = wishListRepository.existsUserByIdAndName(userId, name);
         if (exists) {
-            throw new WishListAlreadyExistsException(wishList.getName());
+            throw new WishListAlreadyExistsException(name);
         }
+
+        WishList wishList = new WishList();
+        wishList.setName(name);
+        wishList.setUser(user);
+
         user.addWishList(wishList);
-        User saveUser = userRepository.save(user);
-        WishList savedWishList = saveUser.getWishlists().stream()
-                .filter(wl -> wl.getName().equals(wishList.getName()))
+        User savedUser = userRepository.save(user);
+
+        WishList savedWishList = savedUser.getWishlists().stream()
+                .filter(wl -> wl.getName().equals(name))
                 .findFirst()
                 .orElseThrow(() -> new WishListNotFoundException("Failed to retrieve saved wishlist"));
 
-        log.info("Successfully added new wishlist with ID: {} for user with ID: {}", savedWishList.getId(), userId);
+        log.info("Successfully created wishlist with ID: {} for user with ID: {}", savedWishList.getId(), userId);
         return WishListMapper.toWishListResponse(savedWishList);
     }
 
     /**
-     * Update an existing Wishlist in the database.
-     * WRITE TRANSACTION: Multiple database operations that must be atomic
+     * Update a wishlist name.
      * 
-     * @param wishListId ID of the Wishlist to be updated
-     * @param userId ID of the User who owns the Wishlist
-     * @param newName New name for the Wishlist
-     * @return Updated Wishlist object
-     * @throws WishListNotFoundException if the Wishlist is not found
-     * @throws WishListAlreadyExistsException if a Wishlist with the same name already exists
+     * @param userId the authenticated user's ID
+     * @param wishListId the wishlist ID
+     * @param newName the new name
+     * @return WishListResponse DTO
+     * @throws WishListNotFoundException if the wishlist is not found
+     * @throws WishListAlreadyExistsException if a wishlist with the same name exists
      */
     @Transactional(
         readOnly = false,
         propagation = Propagation.REQUIRED,
         rollbackFor = {Exception.class}
     )
-    public WishListResponse updateWishListToUser(UpdateWishListRequest request) {
-        log.info("Updating wishlist with ID: {} to name '{}' for user with ID: {}", request.getWishListId(), request.getName(), request.getUserId());
+    public WishListResponse updateWishList(Long userId, Long wishListId, String newName) {
+        log.info("Updating wishlist with ID: {} to name '{}' for user with ID: {}", wishListId, newName, userId);
 
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(userId, wishListId)
+                .orElseThrow(() -> new WishListNotFoundException(wishListId));
         String oldName = wishList.getName();
 
-        boolean exists = wishListRepository.existsByUserIdAndNameExceptId(request.getUserId(), request.getName(), request.getWishListId());
+        boolean exists = wishListRepository.existsByUserIdAndNameExceptId(userId, newName, wishListId);
         if (exists) {
-            throw new WishListAlreadyExistsException(wishList.getName());
+            throw new WishListAlreadyExistsException(newName);
         }
-        wishList.setName(request.getName());
+
+        wishList.setName(newName);
         WishList updatedWishList = wishListRepository.save(wishList);
 
-        log.info("Successfully updated wishlist with ID: {} from '{}' to '{}' for user with ID: {}", request.getWishListId(), oldName, request.getName(), request.getUserId());
+        log.info("Successfully updated wishlist with ID: {} from '{}' to '{}' for user with ID: {}",
+                wishListId, oldName, newName, userId);
         return WishListMapper.toWishListResponse(updatedWishList);
     }
 
     /**
-     * Delete a Wishlist by its ID.
-     * WRITE TRANSACTION: Involves removing relationships and deleting entity
-     * User REQUIRED propagation with higher isolation level for consistency
+     * Delete a wishlist.
      * 
-     * @param wishListId ID of the Wishlist to be deleted
-     * @param userId ID of the User who owns the Wishlist
-     * @throws UserNotFoundException if the User is not found
-     * @throws WishListNotFoundException if the Wishlist is not found
+     * @param userId the authenticated user's ID
+     * @param wishListId the wishlist ID to delete
+     * @return SuccessResponse
+     * @throws UserNotFoundException if the user is not found
+     * @throws WishListNotFoundException if the wishlist is not found
      */
     @Transactional(
         readOnly = false,
         propagation = Propagation.REQUIRED,
-        isolation = Isolation.REPEATABLE_READ, //Higher isolation for delete operations
+        isolation = Isolation.REPEATABLE_READ,
         rollbackFor = {Exception.class}
     )
-    public SuccessResponse deleteWishList(DeleteWishListRequest request) {
-        log.info("Deleting wishlist with ID: {} for user with ID: {}", request.getWishListId(), request.getUserId());
+    public SuccessResponse deleteWishList(Long userId, Long wishListId) {
+        log.info("Deleting wishlist with ID: {} for user with ID: {}", wishListId, userId);
 
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new UserNotFoundException(request.getUserId()));
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(userId, wishListId)
+                .orElseThrow(() -> new WishListNotFoundException(wishListId));
+
         String wishListName = wishList.getName();
         user.removeWishList(wishList);
         userRepository.save(user);
 
-        log.info("Successfully deleted wishlist with ID: {} and name '{}' for user with ID: {}", request.getWishListId(), wishListName, request.getUserId());
+        log.info("Successfully deleted wishlist with ID: {} and name '{}' for user with ID: {}",
+                wishListId, wishListName, userId);
         return new SuccessResponse(true, "WishList deleted successfully");
     }
 
     /**
-     * Add a Book to a Wishlist.
-     * WRITE TRANSACTION: Modifying wishlist-book relationship
-     *      
-     * @param userId ID of the User who owns the Wishlist
-     * @param bookId ID of the Book
-     * @param wishListId ID of the WishList
-     * @throws BookNotFoundException if the Book is not found
-     * @throws WishListNotFoundException if the WishList is not found
-     * @throws BookAlreadyInWishListException if the Book is already in the wishlist
+     * Add a book to a wishlist.
+     * 
+     * @param userId the authenticated user's ID
+     * @param wishListId the wishlist ID
+     * @param bookId the book ID to add
+     * @return SuccessResponse
+     * @throws WishListNotFoundException if the wishlist is not found
+     * @throws BookNotFoundException if the book is not found
+     * @throws BookAlreadyInWishListException if the book is already in the wishlist
      */
     @Transactional(
         readOnly = false,
         propagation = Propagation.REQUIRED,
         rollbackFor = {Exception.class}
     )
-    public SuccessResponse addBookToWishList(AddBookToWishListRequest request) {
-        log.info("Adding book with ID: {} to wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
+    public SuccessResponse addBookToWishList(Long userId, Long wishListId, Long bookId) {
+        log.info("Adding book with ID: {} to wishlist with ID: {} for user with ID: {}", bookId, wishListId, userId);
 
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-        Book book = bookRepository.findById(request.getBookId())
-                .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(userId, wishListId)
+                .orElseThrow(() -> new WishListNotFoundException(wishListId));
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new BookNotFoundException(bookId));
 
-        // Check if book is already in wishlist
         if (wishList.getBooks().contains(book)) {
-            throw new BookAlreadyInWishListException(request.getBookId(), request.getWishListId());
+            throw new BookAlreadyInWishListException(bookId, wishListId);
         }
 
         wishList.addBook(book);
         wishListRepository.save(wishList);
 
-        log.info("Successfully added book with ID: {} to wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
+        log.info("Successfully added book with ID: {} to wishlist with ID: {} for user with ID: {}",
+                bookId, wishListId, userId);
         return new SuccessResponse(true, "Book added to WishList successfully");
     }
 
     /**
-     * Remove a Book from a Wishlist.
-     * WRITE TRANSACTION: Modifying wishlist-book relationship
+     * Remove a book from a wishlist.
      * 
-     * @param userId ID of the User who owns the Wishlist
-     * @param bookId ID of the Book
-     * @param wishListId ID of the WishList
-     * @throws BookNotFoundException if the Book is not found
-     * @throws WishListNotFoundException if the WishList is not found
-     * @throws BookNotInWishListException if the Book is not in the wishlist
+     * @param userId the authenticated user's ID
+     * @param wishListId the wishlist ID
+     * @param bookId the book ID to remove
+     * @return SuccessResponse
+     * @throws WishListNotFoundException if the wishlist is not found
+     * @throws BookNotFoundException if the book is not found
+     * @throws BookNotInWishListException if the book is not in the wishlist
      */
     @Transactional(
         readOnly = false,
         propagation = Propagation.REQUIRED,
         rollbackFor = {Exception.class}
     )
-    public SuccessResponse removeBookFromWishList(RemoveBookFromWishListRequest request) {
-        log.info("Removing book with ID: {} from wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
+    public SuccessResponse removeBookFromWishList(Long userId, Long wishListId, Long bookId) {
+        log.info("Removing book with ID: {} from wishlist with ID: {} for user with ID: {}", bookId, wishListId, userId);
 
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
-        Book book = bookRepository.findById(request.getBookId())
-                .orElseThrow(() -> new BookNotFoundException(request.getBookId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(userId, wishListId)
+                .orElseThrow(() -> new WishListNotFoundException(wishListId));
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new BookNotFoundException(bookId));
 
-        // Check if book is in wishlist
         if (!wishList.getBooks().contains(book)) {
-            throw new BookNotInWishListException(request.getBookId(), request.getWishListId());
+            throw new BookNotInWishListException(bookId, wishListId);
         }
 
         wishList.removeBook(book);
         wishListRepository.save(wishList);
 
-        log.info("Successfully removed book with ID: {} from wishlist with ID: {} for user with ID: {}", request.getBookId(), request.getWishListId(), request.getUserId());
+        log.info("Successfully removed book with ID: {} from wishlist with ID: {} for user with ID: {}",
+                bookId, wishListId, userId);
         return new SuccessResponse(true, "Book removed from WishList successfully");
     }
 
     /**
-     * Bulk add multiple books to a Wishlist.
-     * WRITE TRANSACTION: Multiple database operations that must be atomic
+     * Bulk add multiple books to a wishlist.
      * 
-     * @param request BulkAddBooksToWishListRequest containing userId, wishListId, and list of bookIds
-     * @throws WishListNotFoundException if the Wishlist is not found
-     * @throws BookNotFoundException if any of the Books are not found
-     * @throws BookAlreadyInWishListException if any of the Books are already in the wishlist
-     * @throws Exception for any unexpected errors
-     * @return BulkOperationResponse containing the results of the operation
+     * @param userId the authenticated user's ID
+     * @param wishListId the wishlist ID
+     * @param bookIds list of book IDs to add
+     * @return BulkOperationResponse with results
+     * @throws WishListNotFoundException if the wishlist is not found
      */
     @Transactional(
         readOnly = false,
         propagation = Propagation.REQUIRES_NEW,
         rollbackFor = {Exception.class},
-        timeout = 60 // 60 seconds timeout for bulk operations
+        timeout = 60
     )
-    public BulkOperationResponse addMultipleBooksToWishList(BulkAddBooksToWishListRequest request) {
-        log.info("Adding {} books to wishlist with ID: {} for user with ID: {}", request.getBookIds().size(), request.getWishListId(), request.getUserId());
+    public BulkOperationResponse addMultipleBooksToWishList(Long userId, Long wishListId, List<Long> bookIds) {
+        log.info("Adding {} books to wishlist with ID: {} for user with ID: {}", bookIds.size(), wishListId, userId);
 
         List<BulkOperationDetail> details = new ArrayList<>();
         int successCount = 0, skippedCount = 0, failedCount = 0;
 
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(userId, wishListId)
+                .orElseThrow(() -> new WishListNotFoundException(wishListId));
 
-        for (Long bookId : request.getBookIds()) {
+        for (Long bookId : bookIds) {
             BulkOperationDetail detail = BulkOperationDetail.builder().bookId(bookId).build();
 
             try {
@@ -298,78 +293,68 @@ public class WishListService {
                     detail.setStatus("SKIPPED");
                     detail.setReason("Book already exists in WishList");
                     skippedCount++;
-                    log.debug("Book with ID: {} already exists in wishlist with ID: {} for user with ID: {}, skipping", bookId, request.getWishListId(), request.getUserId());
                 } else {
                     wishList.addBook(book);
                     detail.setStatus("SUCCESS");
                     detail.setReason("Book added successfully");
                     successCount++;
-                    log.debug("Successfully added book with ID: {} to wishlist with ID: {} for user with ID: {}", bookId, request.getWishListId(), request.getUserId());
                 }
             } catch (BookNotFoundException e) {
                 detail.setStatus("FAILED");
                 detail.setReason("Book not found");
                 detail.setBookDescription("Unknown Book");
                 failedCount++;
-                log.warn("Book with ID: {} not found, marking as failed", bookId);
             } catch (RuntimeException e) {
                 detail.setStatus("FAILED");
                 detail.setReason("Unexpected error: " + e.getMessage());
                 failedCount++;
-                log.warn("Unexpected error occurred while processing book with ID: {}", bookId, e);
             }
             details.add(detail);
         }
 
         if (successCount > 0) {
             wishListRepository.save(wishList);
-            log.info("Successfully added {} books to wishlist with ID: {} for user with ID: {}", successCount, request.getWishListId(), request.getUserId());
+            log.info("Successfully added {} books to wishlist with ID: {} for user with ID: {}",
+                    successCount, wishListId, userId);
         }
 
-        BulkOperationResponse response = BulkOperationResponse.builder()
+        return BulkOperationResponse.builder()
                 .success(successCount > 0 || (skippedCount > 0 && failedCount == 0))
                 .message(String.format("Processed %d books: %d added, %d skipped, %d failed",
-                        request.getBookIds().size(), successCount, skippedCount, failedCount))
-                .totalRequested(request.getBookIds().size())
+                        bookIds.size(), successCount, skippedCount, failedCount))
+                .totalRequested(bookIds.size())
                 .successfullyProcessed(successCount)
                 .skipped(skippedCount)
                 .failed(failedCount)
                 .details(details)
                 .build();
-
-        log.info("Bulk add operation completed: {} out of {} books processed successfully",
-                successCount, request.getBookIds().size());
-
-        return response;
     }
 
     /**
-     * Bulk remove multiple books to a Wishlist.
-     * WRITE TRANSACTION: Multiple database operations that must be atomic
+     * Bulk remove multiple books from a wishlist.
      * 
-     * @param request BulkRemoveBooksToWishListRequest containing userId, wishListId, and list of bookIds
-     * @throws WishListNotFoundException if the Wishlist is not found
-     * @throws BookNotFoundException if any of the Books are not found
-     * @throws BookAlreadyInWishListException if any of the Books are already in the wishlist
-     * @throws Exception for any unexpected errors
-     * @return BulkOperationResponse containing the results of the operation
+     * @param userId the authenticated user's ID
+     * @param wishListId the wishlist ID
+     * @param bookIds list of book IDs to remove
+     * @return BulkOperationResponse with results
+     * @throws WishListNotFoundException if the wishlist is not found
      */
     @Transactional(
         readOnly = false,
         propagation = Propagation.REQUIRES_NEW,
         rollbackFor = {Exception.class},
-        timeout = 60 // 60 seconds timeout for bulk operations
+        timeout = 60
     )
-    public BulkOperationResponse removeMultipleBooksFromWishList(BulkRemoveBookFromWishListRequest request) {
-        log.info("Removing {} books from wishlist with ID: {} for user with ID: {}", request.getBookIds().size(), request.getWishListId(), request.getUserId());
+    public BulkOperationResponse removeMultipleBooksFromWishList(Long userId, Long wishListId, List<Long> bookIds) {
+        log.info("Removing {} books from wishlist with ID: {} for user with ID: {}", bookIds.size(), wishListId, userId);
 
         List<BulkOperationDetail> details = new ArrayList<>();
         int successCount = 0, skippedCount = 0, failedCount = 0;
 
-        WishList wishList = wishListRepository.findByUserIdAndWishListId(request.getUserId(), request.getWishListId())
-                .orElseThrow(() -> new WishListNotFoundException(request.getWishListId()));
+        WishList wishList = wishListRepository.findByUserIdAndWishListId(userId, wishListId)
+                .orElseThrow(() -> new WishListNotFoundException(wishListId));
 
-        for (Long bookId : request.getBookIds()) {
+        for (Long bookId : bookIds) {
             BulkOperationDetail detail = BulkOperationDetail.builder().bookId(bookId).build();
 
             try {
@@ -405,21 +390,15 @@ public class WishListService {
             wishListRepository.save(wishList);
         }
 
-        BulkOperationResponse response = BulkOperationResponse.builder()
+        return BulkOperationResponse.builder()
                 .success(successCount > 0 || (skippedCount > 0 && failedCount == 0))
                 .message(String.format("Processed %d books: %d removed, %d skipped, %d failed",
-                        request.getBookIds().size(), successCount, skippedCount, failedCount))
-                .totalRequested(request.getBookIds().size())
+                        bookIds.size(), successCount, skippedCount, failedCount))
+                .totalRequested(bookIds.size())
                 .successfullyProcessed(successCount)
                 .skipped(skippedCount)
                 .failed(failedCount)
                 .details(details)
                 .build();
-
-        log.info("Bulk remove operation completed: {} out of {} books processed successfully",
-                successCount, request.getBookIds().size());
-
-        return response;
     }
-
 }
