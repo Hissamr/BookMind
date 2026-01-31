@@ -1,15 +1,39 @@
 package com.bookmind.controller;
 
-import com.bookmind.model.Book;
-import com.bookmind.service.BookService;
-import lombok.RequiredArgsConstructor;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.*;
+import com.bookmind.model.Book;
+import com.bookmind.service.BookService;
 
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * REST Controller for Book operations.
+ * 
+ * PUBLIC: Read operations (GET) are accessible to all users.
+ * ADMIN ONLY: Write operations (POST, PUT, PATCH, DELETE) require ROLE_ADMIN.
+ */
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1")
@@ -17,161 +41,168 @@ public class BookController {
 
     private final BookService bookService;
 
+    /**
+     * Get all books (public)
+     */
     @GetMapping("/books")
     public ResponseEntity<List<Book>> getAllBooks() {
-       return new ResponseEntity<>(bookService.getAllBooks(), HttpStatus.OK);
+        log.debug("Fetching all books");
+        return ResponseEntity.ok(bookService.getAllBooks());
     }
 
+    /**
+     * Get a book by ID (public)
+     */
     @GetMapping("/books/{id}")
     public ResponseEntity<Book> getBookById(@PathVariable Long id) {
-        try {
-            Book book = bookService.getBookById(id);
-            return new ResponseEntity<>(book, HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+        log.debug("Fetching book with ID: {}", id);
+        Book book = bookService.getBookById(id);
+        return ResponseEntity.ok(book);
     }
 
+    /**
+     * Add a new book (Admin only)
+     */
     @PostMapping("/books")
-    public ResponseEntity<?> addBook(@RequestBody Book book) {
-        try {
-            Book savedBook = bookService.addBook(book);
-            return new ResponseEntity<>(savedBook, HttpStatus.CREATED);
-        }
-        catch (RuntimeException e) {
-            return new ResponseEntity<>("Error adding book: " + e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-        catch (Exception e) {
-            return new ResponseEntity<>("Error adding book: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Book> addBook(@RequestBody @Valid Book book) {
+        log.info("Admin adding new book: {}", book.getTitle());
+        Book savedBook = bookService.addBook(book);
+        return new ResponseEntity<>(savedBook, HttpStatus.CREATED);
     }
 
+    /**
+     * Update a book (Admin only)
+     */
     @PutMapping("/books/{id}")
-    public ResponseEntity<?> updateBook(@PathVariable Long id, @RequestBody Book book) {
-        try {
-            Book updatedBook = bookService.updateBook(id, book);
-            return new ResponseEntity<>(updatedBook, HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Error updating book: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Book> updateBook(@PathVariable Long id, @RequestBody @Valid Book book) {
+        log.info("Admin updating book with ID: {}", id);
+        Book updatedBook = bookService.updateBook(id, book);
+        return ResponseEntity.ok(updatedBook);
     }
 
+    /**
+     * Delete a book (Admin only)
+     */
     @DeleteMapping("/books/{id}")
-    public ResponseEntity<?> deleteBook(@PathVariable Long id) {
-        try {
-            bookService.deleteBook(id);
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Error deleting book: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteBook(@PathVariable Long id) {
+        log.info("Admin deleting book with ID: {}", id);
+        bookService.deleteBook(id);
+        return ResponseEntity.noContent().build();
     }
     
+    /**
+     * Add a category to a book (Admin only)
+     */
     @PostMapping("/books/{bookId}/categories/{categoryId}")
-    public ResponseEntity<?> addCategoryToBook(@PathVariable Long bookId, @PathVariable Long categoryId) {
-        try {
-            bookService.addCategoryToBook(bookId, categoryId);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Error adding category to book: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> addCategoryToBook(@PathVariable Long bookId, @PathVariable Long categoryId) {
+        log.info("Admin adding category {} to book {}", categoryId, bookId);
+        bookService.addCategoryToBook(bookId, categoryId);
+        return ResponseEntity.ok().build();
     }
     
+    /**
+     * Remove a category from a book (Admin only)
+     */
     @DeleteMapping("/books/{bookId}/categories/{categoryId}")
-    public ResponseEntity<?> removeCategoryFromBook(@PathVariable Long bookId, @PathVariable Long categoryId) {
-        try {
-            bookService.removeCategoryFromBook(bookId, categoryId);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Error removing category from book: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> removeCategoryFromBook(@PathVariable Long bookId, @PathVariable Long categoryId) {
+        log.info("Admin removing category {} from book {}", categoryId, bookId);
+        bookService.removeCategoryFromBook(bookId, categoryId);
+        return ResponseEntity.ok().build();
     }
     
+    /**
+     * Add a review to a book (Admin only - reviews should be added via ReviewController)
+     */
     @PostMapping("/books/{bookId}/reviews/{reviewId}")
-    public ResponseEntity<?> addReviewToBook(@PathVariable Long bookId, @PathVariable Long reviewId) {
-        try {
-            bookService.addReviewToBook(bookId, reviewId);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Error adding review to book: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> addReviewToBook(@PathVariable Long bookId, @PathVariable Long reviewId) {
+        log.info("Admin adding review {} to book {}", reviewId, bookId);
+        bookService.addReviewToBook(bookId, reviewId);
+        return ResponseEntity.ok().build();
     }
     
+    /**
+     * Remove a review from a book (Admin only)
+     */
     @DeleteMapping("/books/{bookId}/reviews/{reviewId}")
-    public ResponseEntity<?> removeReviewFromBook(@PathVariable Long bookId, @PathVariable Long reviewId) {
-        try {
-            bookService.removeReviewFromBook(bookId, reviewId);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Error removing review from book: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> removeReviewFromBook(@PathVariable Long bookId, @PathVariable Long reviewId) {
+        log.info("Admin removing review {} from book {}", reviewId, bookId);
+        bookService.removeReviewFromBook(bookId, reviewId);
+        return ResponseEntity.ok().build();
     }
     
-    // Get categories for a specific book
+    /**
+     * Get categories for a specific book (public)
+     */
     @GetMapping("/books/{id}/categories")
     public ResponseEntity<?> getBookCategories(@PathVariable Long id) {
-        try {
-            Book book = bookService.getBookById(id);
-            return new ResponseEntity<>(book.getCategories(), HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Book not found: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        }
+        log.debug("Fetching categories for book {}", id);
+        Book book = bookService.getBookById(id);
+        return ResponseEntity.ok(book.getCategories());
     }
     
-    // Get reviews for a specific book
+    /**
+     * Get reviews for a specific book (public)
+     */
     @GetMapping("/books/{id}/reviews")
     public ResponseEntity<?> getBookReviews(@PathVariable Long id) {
-        try {
-            Book book = bookService.getBookById(id);
-            return new ResponseEntity<>(book.getReviews(), HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Book not found: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        }
+        log.debug("Fetching reviews for book {}", id);
+        Book book = bookService.getBookById(id);
+        return ResponseEntity.ok(book.getReviews());
     }
     
-    // Bulk operations - Add multiple categories to a book
+    /**
+     * Bulk add categories to a book (Admin only)
+     */
     @PostMapping("/books/{bookId}/categories")
-    public ResponseEntity<?> addCategoriesToBook(@PathVariable Long bookId, @RequestBody List<Long> categoryIds) {
-        try {
-            for (Long categoryId : categoryIds) {
-                bookService.addCategoryToBook(bookId, categoryId);
-            }
-            return new ResponseEntity<>("Categories added successfully", HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Error adding categories: " + e.getMessage(), HttpStatus.NOT_FOUND);
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, String>> addCategoriesToBook(@PathVariable Long bookId, @RequestBody List<Long> categoryIds) {
+        log.info("Admin bulk adding {} categories to book {}", categoryIds.size(), bookId);
+        for (Long categoryId : categoryIds) {
+            bookService.addCategoryToBook(bookId, categoryId);
         }
+        return ResponseEntity.ok(Map.of("message", "Categories added successfully"));
     }
     
-    // Remove all categories from a book
+    /**
+     * Remove all categories from a book (Admin only)
+     */
     @DeleteMapping("/books/{bookId}/categories")
-    public ResponseEntity<?> removeAllCategoriesFromBook(@PathVariable Long bookId) {
-        try {
-            Book book = bookService.getBookById(bookId);
-            // Create a copy of categories to avoid concurrent modification
-            var categories = new ArrayList<>(book.getCategories());
-            for (var category : categories) {
-                bookService.removeCategoryFromBook(bookId, category.getId());
-            }
-            return new ResponseEntity<>("All categories removed successfully", HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Error removing categories: " + e.getMessage(), HttpStatus.NOT_FOUND);
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, String>> removeAllCategoriesFromBook(@PathVariable Long bookId) {
+        log.info("Admin removing all categories from book {}", bookId);
+        Book book = bookService.getBookById(bookId);
+        var categories = new ArrayList<>(book.getCategories());
+        for (var category : categories) {
+            bookService.removeCategoryFromBook(bookId, category.getId());
         }
+        return ResponseEntity.ok(Map.of("message", "All categories removed successfully"));
     }
     
+    /**
+     * Search books by title, author, or genre (public)
+     */
     @GetMapping("/books/search")
-    public ResponseEntity<?> searchBooks(@RequestParam(required = false) String title,
-                                         @RequestParam(required = false) String author,
-                                         @RequestParam(required = false) String genre) {
-        try {
-            List<Book> books = bookService.searchBooks(title, author, genre);
-            return new ResponseEntity<>(books, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error searching for books: " + e.getMessage(), 
-                                       HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public ResponseEntity<List<Book>> searchBooks(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String author,
+            @RequestParam(required = false) String genre) {
+        log.debug("Searching books - title: {}, author: {}, genre: {}", title, author, genre);
+        List<Book> books = bookService.searchBooks(title, author, genre);
+        return ResponseEntity.ok(books);
     }
     
+    /**
+     * Advanced search with multiple filters (public)
+     */
     @GetMapping("/books/advanced-search")
-    public ResponseEntity<?> advancedSearchBooks(
+    public ResponseEntity<List<Book>> advancedSearchBooks(
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String author,
             @RequestParam(required = false) String genre,
@@ -180,61 +211,59 @@ public class BookController {
             @RequestParam(required = false) Double maxPrice,
             @RequestParam(required = false) Double minRating,
             @RequestParam(required = false) Boolean available) {
-        try {
-            List<Book> books = bookService.advancedSearchBooks(
+        log.debug("Advanced search - title: {}, author: {}, genre: {}, minPrice: {}, maxPrice: {}",
+                title, author, genre, minPrice, maxPrice);
+        List<Book> books = bookService.advancedSearchBooks(
                 title, author, genre, description, minPrice, maxPrice, minRating, available);
-            return new ResponseEntity<>(books, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error searching for books: " + e.getMessage(), 
-                                       HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return ResponseEntity.ok(books);
     }
     
+    /**
+     * Get books by category (public)
+     */
     @GetMapping("/categories/{categoryId}/books")
-    public ResponseEntity<?> getBooksByCategory(@PathVariable Long categoryId) {
-        try {
-            List<Book> books = bookService.getBooksByCategory(categoryId);
-            return new ResponseEntity<>(books, HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Error finding books: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        }
+    public ResponseEntity<List<Book>> getBooksByCategory(@PathVariable Long categoryId) {
+        log.debug("Fetching books for category {}", categoryId);
+        List<Book> books = bookService.getBooksByCategory(categoryId);
+        return ResponseEntity.ok(books);
     }
     
+    /**
+     * Get all available books (public)
+     */
     @GetMapping("/books/available")
-    public ResponseEntity<?> getAvailableBooks() {
-        try {
-            List<Book> books = bookService.getAvailableBooks();
-            return new ResponseEntity<>(books, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error finding available books: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public ResponseEntity<List<Book>> getAvailableBooks() {
+        log.debug("Fetching available books");
+        List<Book> books = bookService.getAvailableBooks();
+        return ResponseEntity.ok(books);
     }
     
+    /**
+     * Get top-rated books (public)
+     */
     @GetMapping("/books/top-rated")
-    public ResponseEntity<?> getTopRatedBooks(@RequestParam(required = false, defaultValue = "4.0") Double minRating) {
-        try {
-            List<Book> books = bookService.getTopRatedBooks(minRating);
-            return new ResponseEntity<>(books, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error finding top-rated books: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public ResponseEntity<List<Book>> getTopRatedBooks(
+            @RequestParam(required = false, defaultValue = "4.0") Double minRating) {
+        log.debug("Fetching top-rated books with min rating: {}", minRating);
+        List<Book> books = bookService.getTopRatedBooks(minRating);
+        return ResponseEntity.ok(books);
     }
     
+    /**
+     * Get books within price range (public)
+     */
     @GetMapping("/books/price-range")
-    public ResponseEntity<?> getBooksByPriceRange(@RequestParam Double maxPrice) {
-        try {
-            List<Book> books = bookService.getBooksByPriceRange(maxPrice);
-            return new ResponseEntity<>(books, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error finding books by price: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public ResponseEntity<List<Book>> getBooksByPriceRange(@RequestParam Double maxPrice) {
+        log.debug("Fetching books with max price: {}", maxPrice);
+        List<Book> books = bookService.getBooksByPriceRange(maxPrice);
+        return ResponseEntity.ok(books);
     }
     
+    /**
+     * Search books with pagination (public)
+     */
     @GetMapping("/books/search/paged")
-    public ResponseEntity<?> searchBooksWithPagination(
+    public ResponseEntity<Map<String, Object>> searchBooksWithPagination(
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String author,
             @RequestParam(required = false) String genre,
@@ -247,159 +276,144 @@ public class BookController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "title") String sortBy,
             @RequestParam(defaultValue = "asc") String direction) {
-        try {
-            Page<Book> books = bookService.searchBooksWithPagination(
+        log.debug("Paged search - page: {}, size: {}, sortBy: {}", page, size, sortBy);
+        Page<Book> books = bookService.searchBooksWithPagination(
                 title, author, genre, description, minPrice, maxPrice, minRating, available,
                 page, size, sortBy, direction);
-                
-            Map<String, Object> response = new HashMap<>();
-            response.put("books", books.getContent());
-            response.put("currentPage", books.getNumber());
-            response.put("totalItems", books.getTotalElements());
-            response.put("totalPages", books.getTotalPages());
-                
-            return new ResponseEntity<>(response, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error searching for books: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("books", books.getContent());
+        response.put("currentPage", books.getNumber());
+        response.put("totalItems", books.getTotalElements());
+        response.put("totalPages", books.getTotalPages());
+
+        return ResponseEntity.ok(response);
     }
     
-    // ================== Additional Comprehensive Endpoints ==================
-    
-    // Get all books with pagination
+    // ==================== ADDITIONAL ENDPOINTS ====================
+
+    /**
+     * Get all books with pagination (public)
+     */
     @GetMapping("/books/paged")
-    public ResponseEntity<?> getAllBooksWithPagination(
+    public ResponseEntity<Map<String, Object>> getAllBooksWithPagination(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "title") String sortBy,
             @RequestParam(defaultValue = "asc") String direction) {
-        try {
-            Page<Book> books = bookService.searchBooksWithPagination(
+        log.debug("Fetching all books paged - page: {}, size: {}", page, size);
+        Page<Book> books = bookService.searchBooksWithPagination(
                 null, null, null, null, null, null, null, null,
                 page, size, sortBy, direction);
-                
-            Map<String, Object> response = new HashMap<>();
-            response.put("books", books.getContent());
-            response.put("currentPage", books.getNumber());
-            response.put("totalItems", books.getTotalElements());
-            response.put("totalPages", books.getTotalPages());
-            response.put("hasNext", books.hasNext());
-            response.put("hasPrevious", books.hasPrevious());
-                
-            return new ResponseEntity<>(response, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error retrieving books: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("books", books.getContent());
+        response.put("currentPage", books.getNumber());
+        response.put("totalItems", books.getTotalElements());
+        response.put("totalPages", books.getTotalPages());
+        response.put("hasNext", books.hasNext());
+        response.put("hasPrevious", books.hasPrevious());
+
+        return ResponseEntity.ok(response);
     }
     
-    // Get books by author
+    /**
+     * Get books by author (public)
+     */
     @GetMapping("/books/author")
-    public ResponseEntity<?> getBooksByAuthor(@RequestParam String author) {
-        try {
-            List<Book> books = bookService.searchBooks(null, author, null);
-            return new ResponseEntity<>(books, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error finding books by author: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public ResponseEntity<List<Book>> getBooksByAuthor(@RequestParam String author) {
+        log.debug("Fetching books by author: {}", author);
+        List<Book> books = bookService.searchBooks(null, author, null);
+        return ResponseEntity.ok(books);
     }
     
-    // Get books by genre
+    /**
+     * Get books by genre (public)
+     */
     @GetMapping("/books/genre")
-    public ResponseEntity<?> getBooksByGenre(@RequestParam String genre) {
-        try {
-            List<Book> books = bookService.searchBooks(null, null, genre);
-            return new ResponseEntity<>(books, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error finding books by genre: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public ResponseEntity<List<Book>> getBooksByGenre(@RequestParam String genre) {
+        log.debug("Fetching books by genre: {}", genre);
+        List<Book> books = bookService.searchBooks(null, null, genre);
+        return ResponseEntity.ok(books);
     }
     
-    // Get book statistics/summary
+    /**
+     * Get book statistics (public)
+     */
     @GetMapping("/books/stats")
-    public ResponseEntity<?> getBookStatistics() {
-        try {
-            List<Book> allBooks = bookService.getAllBooks();
-            Map<String, Object> stats = new HashMap<>();
-            
-            stats.put("totalBooks", allBooks.size());
-            stats.put("availableBooks", allBooks.stream().filter(Book::getAvailable).count());
-            stats.put("averagePrice", allBooks.stream().mapToDouble(Book::getPrice).average().orElse(0.0));
-            stats.put("averageRating", allBooks.stream().mapToDouble(Book::getAverageRating).average().orElse(0.0));
-            
-            // Top genres
-            Map<String, Long> genreCount = new HashMap<>();
-            allBooks.forEach(book -> {
-                String genre = book.getGenre();
-                if (genre != null && !genre.trim().isEmpty()) {
-                    genreCount.put(genre, genreCount.getOrDefault(genre, 0L) + 1);
-                }
-            });
-            stats.put("genreDistribution", genreCount);
-            
-            return new ResponseEntity<>(stats, HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error calculating statistics: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public ResponseEntity<Map<String, Object>> getBookStatistics() {
+        log.debug("Calculating book statistics");
+        List<Book> allBooks = bookService.getAllBooks();
+        Map<String, Object> stats = new HashMap<>();
+
+        stats.put("totalBooks", allBooks.size());
+        stats.put("availableBooks", allBooks.stream().filter(Book::getAvailable).count());
+        stats.put("averagePrice", allBooks.stream().mapToDouble(Book::getPrice).average().orElse(0.0));
+        stats.put("averageRating", allBooks.stream().mapToDouble(Book::getAverageRating).average().orElse(0.0));
+
+        Map<String, Long> genreCount = new HashMap<>();
+        allBooks.forEach(book -> {
+            String genre = book.getGenre();
+            if (genre != null && !genre.trim().isEmpty()) {
+                genreCount.put(genre, genreCount.getOrDefault(genre, 0L) + 1);
+            }
+        });
+        stats.put("genreDistribution", genreCount);
+
+        return ResponseEntity.ok(stats);
     }
     
-    // Partial update (PATCH) for books
+    /**
+     * Partial update a book (Admin only)
+     */
     @PatchMapping("/books/{id}")
-    public ResponseEntity<?> partialUpdateBook(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
-        try {
-            Book existingBook = bookService.getBookById(id);
-            
-            // Apply partial updates
-            updates.forEach((key, value) -> {
-                switch (key.toLowerCase()) {
-                    case "title" -> existingBook.setTitle((String) value);
-                    case "author" -> existingBook.setAuthor((String) value);
-                    case "description" -> existingBook.setDescription((String) value);
-                    case "genre" -> existingBook.setGenre((String) value);
-                    case "price" -> existingBook.setPrice(((Number) value).doubleValue());
-                    case "available" -> existingBook.setAvailable((Boolean) value);
-                    case "pages" -> existingBook.setPages(((Number) value).intValue());
-                    case "language" -> existingBook.setLanguage((String) value);
-                    case "publisher" -> existingBook.setPublisher((String) value);
-                    case "publicationyear" -> existingBook.setPublicationYear(((Number) value).intValue());
-                    case "coverimageurl" -> existingBook.setCoverImageUrl((String) value);
-                    case "isbn" -> existingBook.setIsbn((String) value);
-                }
-            });
-            
-            Book updatedBook = bookService.updateBook(id, existingBook);
-            return new ResponseEntity<>(updatedBook, HttpStatus.OK);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>("Book not found: " + e.getMessage(), HttpStatus.NOT_FOUND);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error updating book: " + e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Book> partialUpdateBook(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        log.info("Admin partially updating book with ID: {}", id);
+        Book existingBook = bookService.getBookById(id);
+
+        updates.forEach((key, value) -> {
+            switch (key.toLowerCase()) {
+                case "title" -> existingBook.setTitle((String) value);
+                case "author" -> existingBook.setAuthor((String) value);
+                case "description" -> existingBook.setDescription((String) value);
+                case "genre" -> existingBook.setGenre((String) value);
+                case "price" -> existingBook.setPrice(((Number) value).doubleValue());
+                case "available" -> existingBook.setAvailable((Boolean) value);
+                case "pages" -> existingBook.setPages(((Number) value).intValue());
+                case "language" -> existingBook.setLanguage((String) value);
+                case "publisher" -> existingBook.setPublisher((String) value);
+                case "publicationyear" -> existingBook.setPublicationYear(((Number) value).intValue());
+                case "coverimageurl" -> existingBook.setCoverImageUrl((String) value);
+                case "isbn" -> existingBook.setIsbn((String) value);
+            }
+        });
+
+        Book updatedBook = bookService.updateBook(id, existingBook);
+        return ResponseEntity.ok(updatedBook);
     }
     
-    // Check if a book exists
+    /**
+     * Check if a book exists (public)
+     */
     @GetMapping("/books/{id}/exists")
-    public ResponseEntity<?> bookExists(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Boolean>> bookExists(@PathVariable Long id) {
+        log.debug("Checking if book {} exists", id);
         try {
             bookService.getBookById(id);
-            return new ResponseEntity<>(Map.of("exists", true), HttpStatus.OK);
+            return ResponseEntity.ok(Map.of("exists", true));
         } catch (RuntimeException e) {
-            return new ResponseEntity<>(Map.of("exists", false), HttpStatus.OK);
+            return ResponseEntity.ok(Map.of("exists", false));
         }
     }
     
-    // Get books count
+    /**
+     * Get total books count (public)
+     */
     @GetMapping("/books/count")
-    public ResponseEntity<?> getBooksCount() {
-        try {
-            long count = bookService.getAllBooks().size();
-            return new ResponseEntity<>(Map.of("count", count), HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error counting books: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public ResponseEntity<Map<String, Object>> getBooksCount() {
+        log.debug("Counting total books");
+        long count = bookService.getAllBooks().size();
+        return ResponseEntity.ok(Map.of("count", count));
     }
 }
