@@ -30,3 +30,6 @@ nbdist/
 
 # Build outputs
 build/
+
+# Local
+.env

@@ -42,6 +42,11 @@ public class Book {
     private String isbn;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    
+    // AI-generated summary fields
+    @Column(length = 4000)
+    private String aiSummary;
+    private LocalDateTime summaryGeneratedAt;
 
     public void addCategory(Category category) {
         if(category != null){
