@@ -96,7 +96,7 @@ public class WishListService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        boolean exists = wishListRepository.existsUserByIdAndName(userId, name);
+        boolean exists = wishListRepository.existsByUserIdAndName(userId, name);
         if (exists) {
             throw new WishListAlreadyExistsException(name);
         }

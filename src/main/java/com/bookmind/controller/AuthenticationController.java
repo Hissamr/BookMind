@@ -1,19 +1,33 @@
 package com.bookmind.controller;
 
-import com.bookmind.dto.*;
-import com.bookmind.service.AuthenticationService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.bookmind.dto.LoginRequest;
+import com.bookmind.dto.LoginResponse;
+import com.bookmind.dto.RegisterRequest;
+import com.bookmind.dto.RegisterResponse;
+import com.bookmind.dto.SuccessResponse;
+import com.bookmind.dto.TokenRefreshRequest;
+import com.bookmind.dto.TokenRefreshResponse;
+import com.bookmind.dto.UserSummaryDto;
+import com.bookmind.service.AuthenticationService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthenticationController {
 

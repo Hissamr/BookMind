@@ -36,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/wishlists")
+@RequestMapping("/v1/wishlists")
 public class WishListController {
 
     private final WishListService wishListService;

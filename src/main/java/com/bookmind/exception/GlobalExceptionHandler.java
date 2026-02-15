@@ -1,6 +1,10 @@
 package com.bookmind.exception;
 
-import com.bookmind.dto.ErrorResponse;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -10,16 +14,16 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import com.bookmind.dto.ErrorResponse;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Global exception handler that catches exceptions from all controllers
  * and returns consistent error responses
  */
 @ControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     /**
@@ -186,7 +190,7 @@ public class GlobalExceptionHandler {
                 .build();
         
         // Log the actual exception details for debugging
-        // logger.error("Unexpected error occurred", ex);
+        log.error("Unexpected error occurred: {}", ex.getMessage(), ex);
         
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }

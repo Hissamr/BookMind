@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 public class BookSummaryService {
 
     private final BookRepository bookRepository;
-    private final OpenAIService openAIService;
+    private final GoogleAiClient googleAiClient;
 
     /**
      * Get the summary for a book. Returns cached summary if available,
@@ -127,7 +127,28 @@ public class BookSummaryService {
      * Internal method to generate and save a summary for a book.
      */
     private BookSummaryResponse generateAndSaveSummary(Book book) {
-        String summary = openAIService.generateBookSummary(book);
+        String prompt = """
+            You are a helpful book expert. Generate a compelling and informative summary for the following book.
+            The summary should be engaging, highlight key themes, and help readers decide if they want to read it.
+            Keep the summary between 150-250 words.
+            
+            Book Details:
+            - Title: %s
+            - Author: %s
+            - Genre: %s
+            - Description: %s
+            - Publication Year: %s
+            - Pages: %s
+            
+            Please provide a well-structured summary that includes:
+            1. A brief overview of what the book is about
+            2. Key themes or topics covered
+            3. Who would enjoy this book
+            
+            Summary:
+            """.formatted(book.getTitle(), book.getAuthor(), book.getGenre(), book.getDescription(), book.getPublicationYear(), book.getPages());
+            
+        String summary = googleAiClient.generateBookSummary(prompt);
         LocalDateTime generatedAt = LocalDateTime.now();
 
         book.setAiSummary(summary);
