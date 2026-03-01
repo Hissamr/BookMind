@@ -1,4 +1,3 @@
-version: '3.8'
 services:
 
   app:
@@ -11,6 +10,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/bookmind
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - JWT_SECRET=your-256-bit-secret-key-here
+      - JWT_REFRESH_SECRET=your-refresh-secret-key-here
+      - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
     networks:
       - bookmind-net
 
@@ -27,6 +29,11 @@ services:
       - dbdata:/var/lib/postgresql/data
     networks:
       - bookmind-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:alpine
